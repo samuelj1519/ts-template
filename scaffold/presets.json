@@ -1,0 +1,20 @@
+{
+  "rootPreset": "vanilla",
+  "presets": [
+    {
+      "id": "vanilla",
+      "replaces": [],
+      "ruleOverrides": []
+    },
+    {
+      "id": "react",
+      "replaces": [],
+      "ruleOverrides": []
+    },
+    {
+      "id": "vue",
+      "replaces": [],
+      "ruleOverrides": []
+    }
+  ]
+}

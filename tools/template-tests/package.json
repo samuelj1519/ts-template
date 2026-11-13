@@ -1,0 +1,34 @@
+{
+  "name": "ts-template-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "npm@12.2.2",
+  "engines": {
+    "node": ">=26.13.1 <27",
+    "npm": ">=12.2.2 <13"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:inputs": "prettier --ignore-path .prettierignore --config ../../scaffold/common/.prettierrc.json --write ../../scaffold/common ../../scaffold/presets ../../scaffold/presets.json",
+    "format:inputs:check": "prettier --ignore-path .prettierignore --config ../../scaffold/common/.prettierrc.json --check ../../scaffold/common ../../scaffold/presets ../../scaffold/presets.json",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives .",
+    "typecheck": "tsc --noEmit",
+    "templates:sync": "node src/cli.ts sync",
+    "templates:check": "node src/cli.ts check",
+    "templates:locks": "node src/cli.ts locks",
+    "test": "node --test --test-concurrency=1 tests/*.test.ts",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "giget": "3.3.1",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "prettier": "3.10.1",
+    "typescript": "7.0.2",
+    "zod": "4.6.7"
+  }
+}

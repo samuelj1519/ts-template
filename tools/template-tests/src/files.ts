@@ -1,0 +1,140 @@
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, posix, relative, sep } from 'node:path';
+
+export type FileEntry = { readonly content: Buffer; readonly mode: number };
+export type FileMap = ReadonlyMap<string, FileEntry>;
+
+export const runtimePaths = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'coverage',
+  'artifacts',
+  'reports',
+  '.stryker-tmp',
+  '.worktrees',
+]);
+const maintenancePaths = new Set([
+  'CONTRIBUTING.md',
+  '.github/workflows/template.yml',
+  'scaffold',
+  'templates',
+  'tools/template-tests',
+]);
+
+export function validPath(path: string): boolean {
+  return (
+    path.length > 0 &&
+    !path.includes('\\') &&
+    !path.includes(':') &&
+    !path.includes('\0') &&
+    !posix.isAbsolute(path) &&
+    posix.normalize(path) === path &&
+    !path.split('/').some((part) => part === '..' || part === '.' || part === '')
+  );
+}
+
+export function realDirectory(path: string): void {
+  const entry = lstatSync(path);
+  if (!entry.isDirectory() || entry.isSymbolicLink())
+    throw new Error(`Expected a real directory: ${path}`);
+}
+
+export function rootExcluded(path: string): boolean {
+  return runtimePaths.has(path) || maintenancePaths.has(path);
+}
+
+export function readFiles(root: string, exclude: (path: string) => boolean = () => false): FileMap {
+  realDirectory(root);
+  const found = new Map<string, FileEntry>();
+  function visit(directory: string): void {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolute = join(directory, entry.name);
+      const path = relative(root, absolute).split(sep).join('/');
+      if (exclude(path)) continue;
+      if (!validPath(path) || entry.isSymbolicLink())
+        throw new Error(`Unsafe template entry: ${path}`);
+      if (entry.isDirectory()) visit(absolute);
+      else {
+        if (!entry.isFile()) throw new Error(`Unexpected template entry: ${path}`);
+        found.set(path, {
+          content: readFileSync(absolute),
+          mode: statSync(absolute).mode & 0o111 ? 0o755 : 0o644,
+        });
+      }
+    }
+  }
+  visit(root);
+  return new Map([...found].sort(([left], [right]) => left.localeCompare(right)));
+}
+
+export function sameEntry(left: FileEntry, right: FileEntry): boolean {
+  return left.mode === right.mode && left.content.equals(right.content);
+}
+
+export function compareFiles(actual: FileMap, expected: FileMap, label: string): void {
+  if (actual.size !== expected.size || [...actual.keys()].some((path) => !expected.has(path)))
+    throw new Error(`${label}: complete file sets differ.`);
+  for (const [path, entry] of expected) {
+    const found = actual.get(path);
+    if (!found || !sameEntry(found, entry))
+      throw new Error(`${label}: file bytes or mode differ: ${path}`);
+  }
+}
+
+export function writeFiles(root: string, files: FileMap): void {
+  mkdirSync(root, { recursive: true });
+  realDirectory(root);
+  validateDestination(root, files);
+  for (const [path, entry] of files) {
+    if (!validPath(path)) throw new Error(`Unsafe output path: ${path}`);
+    const absolute = join(root, path);
+    const ancestors = path.split('/').slice(0, -1);
+    let directory = root;
+    for (const name of ancestors) {
+      directory = join(directory, name);
+      if (existsSync(directory)) realDirectory(directory);
+      else mkdirSync(directory);
+    }
+    if (existsSync(absolute) && !lstatSync(absolute).isFile())
+      throw new Error(`Unsafe output file: ${absolute}`);
+    if (lstatIfPresent(absolute)?.isSymbolicLink())
+      throw new Error(`Output links are not allowed: ${absolute}`);
+    mkdirSync(dirname(absolute), { recursive: true });
+    writeFileSync(absolute, entry.content);
+    chmodSync(absolute, entry.mode);
+  }
+}
+
+export function validateDestination(root: string, files: FileMap): void {
+  if (lstatIfPresent(root)) realDirectory(root);
+  for (const path of files.keys()) {
+    if (!validPath(path)) throw new Error(`Unsafe output path: ${path}`);
+    let directory = root;
+    for (const name of path.split('/').slice(0, -1)) {
+      directory = join(directory, name);
+      if (lstatIfPresent(directory)) realDirectory(directory);
+    }
+    const existing = lstatIfPresent(join(root, path));
+    if (existing && (!existing.isFile() || existing.isSymbolicLink()))
+      throw new Error(`Unsafe output file: ${path}`);
+  }
+}
+
+export function lstatIfPresent(path: string) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
