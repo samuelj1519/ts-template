@@ -265,6 +265,19 @@ checks.push(
 );
 
 checks.push(
+  test('complete checking ignores install residuals but rejects extra payload files', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      put(root, 'templates/vanilla/node_modules/leftover/package.json', '{}\n');
+      put(root, 'templates/vanilla/.npm/_cacache/index', 'cache\n');
+      await checkTemplates(root);
+      put(root, 'templates/vanilla/untracked-edit.txt', 'drift\n');
+      await assert.rejects(checkTemplates(root), /complete file sets differ/u);
+    });
+  }),
+);
+
+checks.push(
   test('sync removes only unchanged previously owned stale files', async () => {
     await isolated(async (root) => {
       put(root, 'scaffold/common/retired.ts', 'export const old = 1;\n');

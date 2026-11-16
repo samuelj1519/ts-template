@@ -57,6 +57,35 @@ void test('defaults-full-cross only targets macOS and Windows default presets', 
   assert.match(block, /npm run check:full/);
 });
 
+void test('defaults-milestone matrix lists the three default presets', () => {
+  const block = workflow.slice(
+    workflow.indexOf('defaults-milestone:'),
+    workflow.indexOf('npm-audit-advisory:'),
+  );
+  assert.match(block, /template: \[vanilla, react, vue\]/);
+  assert.match(block, /npm run check:milestone/);
+});
+
+void test('npm-audit-advisory handles error JSON without blocking the workflow', () => {
+  const block = workflow.slice(workflow.indexOf('npm-audit-advisory:'));
+  assert.match(block, /continue-on-error: true/);
+  assert.match(block, /payload\.error/);
+  assert.match(block, /process\.exit\(2\)/);
+});
+
+void test('twelve-check bun templates do not run npm ci', () => {
+  const block = workflow.slice(
+    workflow.indexOf('twelve-check:'),
+    workflow.indexOf('defaults-full-cross:'),
+  );
+  const step =
+    block.match(/- name: Frozen install and check[\s\S]*?(?=\n  [a-z-]+:)/u)?.[0] ?? block;
+  const bunBranch = step.split(/\n\s*else\b/u)[0] ?? '';
+  assert.match(bunBranch, /-bun-\*/u);
+  assert.match(bunBranch, /bun install --frozen-lockfile/u);
+  assert.doesNotMatch(bunBranch, /npm ci/u);
+});
+
 void test('static enumerate step uses sorted twelve-way comparison', () => {
   assert.doesNotMatch(workflow, /test \\"\\$\{/u);
   assert.match(workflow, /registry\.templateIds\]\.sort\(\)/u);

@@ -17,6 +17,7 @@ import {
   readFiles,
   realDirectory,
   rootExcluded,
+  templatePayloadExcluded,
   sameEntry,
   validateDestination,
   writeFiles,
@@ -26,7 +27,7 @@ import { canonicalJson, jsonFile, mergeObjects, parseObject } from './merge.ts';
 
 const MAINTAINER_ROOT_SCRIPT_KEYS = ['templates:verify'] as const;
 
-function withoutMaintainerRootScripts(files: FileMap): FileMap {
+export function withoutMaintainerRootScripts(files: FileMap): FileMap {
   const entry = files.get('package.json');
   if (!entry) return files;
   const manifest = JSON.parse(entry.content.toString('utf8')) as {
@@ -285,7 +286,11 @@ export async function checkTemplates(root: string): Promise<void> {
   if (actual.some((name) => !expectedIds.has(name)))
     throw new Error('Unknown generated output directory.');
   for (const template of composition.templates)
-    compareFiles(readFiles(join(output, template.id)), template.files, `templates/${template.id}`);
+    compareFiles(
+      readFiles(join(output, template.id), templatePayloadExcluded),
+      template.files,
+      `templates/${template.id}`,
+    );
   const selected = composition.templates.find((entry) => entry.id === composition.rootPreset);
   if (!selected) throw new Error('Root preset is missing.');
   compareFiles(

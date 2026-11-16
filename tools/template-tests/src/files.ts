@@ -55,6 +55,15 @@ export function rootExcluded(path: string): boolean {
   return path.startsWith('.handoff/');
 }
 
+const templateInstallResidualRoots = new Set(['.npm', '.bun']);
+
+export function templatePayloadExcluded(path: string): boolean {
+  const parts = path.split('/');
+  if (parts.some((part) => part === 'node_modules')) return true;
+  const root = parts[0];
+  return root !== undefined && templateInstallResidualRoots.has(root);
+}
+
 export function readFiles(root: string, exclude: (path: string) => boolean = () => false): FileMap {
   realDirectory(root);
   const found = new Map<string, FileEntry>();
