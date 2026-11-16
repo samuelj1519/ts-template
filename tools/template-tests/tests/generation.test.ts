@@ -26,7 +26,8 @@ import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 import { verifyInheritedPolicies } from './policy-probes.ts';
-import { checkTemplates, withoutMaintainerRootScripts } from '../src/assembly.ts';
+import { checkTemplates } from '../src/assembly.ts';
+import { withoutMaintainerRootScripts } from '../src/root-scripts.ts';
 import { templatePayloadExcluded, type FileEntry, type FileMap } from '../src/files.ts';
 import {
   verifyAccessibilityMutation,

@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { check } from 'prettier';
 import {
   checkTemplates,
@@ -18,11 +19,13 @@ import {
   composeRepository,
   syncTemplates,
 } from '../src/assembly.ts';
+import { maintainerRootScriptKeys } from '../src/root-scripts.ts';
 import { compareFiles, readFiles, rootExcluded } from '../src/files.ts';
 import type { PresetId } from '../src/registry.ts';
 import { bunLockStub, npmLockStub } from './lock-stubs.ts';
 
 const ids: PresetId[] = ['vanilla', 'react', 'vue'];
+const repository = fileURLToPath(new URL('../../..', import.meta.url));
 const checks: Promise<void>[] = [];
 
 function put(root: string, path: string, value: string): void {
@@ -261,6 +264,25 @@ checks.push(
         'export const value = 1;\n',
       );
     });
+  }),
+);
+
+checks.push(
+  test('root bootstrap rejects scripts outside maintainerRootScriptKeys', async () => {
+    const manifestPath = join(repository, 'package.json');
+    const original = readFileSync(manifestPath, 'utf8');
+    const manifest = JSON.parse(original) as { scripts?: Record<string, string> };
+    manifest.scripts = {
+      ...manifest.scripts,
+      'synthetic-extra-maintainer': 'node --version',
+    };
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    try {
+      await assert.rejects(checkTemplates(repository), /Root bootstrap/u);
+      assert.deepEqual([...maintainerRootScriptKeys], ['templates:verify']);
+    } finally {
+      writeFileSync(manifestPath, original);
+    }
   }),
 );
 

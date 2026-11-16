@@ -24,22 +24,7 @@ import {
 } from './files.ts';
 import type { FileEntry, FileMap } from './files.ts';
 import { canonicalJson, jsonFile, mergeObjects, parseObject } from './merge.ts';
-
-const MAINTAINER_ROOT_SCRIPT_KEYS = ['templates:verify'] as const;
-
-export function withoutMaintainerRootScripts(files: FileMap): FileMap {
-  const entry = files.get('package.json');
-  if (!entry) return files;
-  const manifest = JSON.parse(entry.content.toString('utf8')) as {
-    scripts?: Record<string, string>;
-  };
-  const scripts = { ...manifest.scripts };
-  for (const key of MAINTAINER_ROOT_SCRIPT_KEYS) delete scripts[key];
-  const normalized = Buffer.from(JSON.stringify({ ...manifest, scripts }, null, 2) + '\n', 'utf8');
-  const clone = new Map(files);
-  clone.set('package.json', { content: normalized, mode: entry.mode });
-  return clone;
-}
+import { withoutMaintainerRootScripts } from './root-scripts.ts';
 import type { JsonObject } from './merge.ts';
 import { authoritativeLockPath, templateDirectoryId, transformManifest } from './options.ts';
 import { presetIdSchema, readRegistry } from './registry.ts';
