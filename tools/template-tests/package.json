@@ -20,7 +20,7 @@
     "templates:check": "node src/cli.ts check",
     "templates:locks": "node src/cli.ts locks",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
-    "test:static": "node --test --test-concurrency=1 tests/assembly.test.ts tests/handoff-isolation.test.ts tests/options-matrix.test.ts",
+    "test:static": "node --test --test-concurrency=1 tests/assembly.test.ts tests/handoff-isolation.test.ts tests/locks-audit.test.ts tests/options-matrix.test.ts tests/react-ts6-oxlint.test.ts tests/workflow-static.test.ts",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
     "check:static": "npm run format:check && npm run lint && npm run typecheck && npm run test:static"
   },

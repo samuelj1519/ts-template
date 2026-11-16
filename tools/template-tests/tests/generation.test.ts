@@ -1,9 +1,8 @@
 /**
- * CI scheduling (plan 6.3): defaults `vanilla` / `react` / `vue` keep full install and
- * `check:milestone` in `template.yml / defaults-milestone`. Pairwise A–F and fixed risk row G
- * run real `check:full` via `template.yml / options-full` and `bun-risk-full` on hosted runners.
- * This file stays maintainer-local install and milestone evidence; it is excluded from
- * `npm run test:static` so cheap static jobs do not pull Playwright or full milestone cost.
+ * CI scheduling (plan 6.3): `template.yml / contracts` runs this full suite on three systems.
+ * Defaults use `defaults-full` and `defaults-milestone`; pairwise B–G use `options-full` and
+ * G additionally uses `bun-risk-full` on push. This file stays the behavioral contract source;
+ * `npm run test:static` stays cheap and excludes it.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

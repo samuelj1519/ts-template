@@ -98,11 +98,12 @@ export async function composePackage(
   return manifest;
 }
 
-function applyOptionFiles(
+async function applyOptionFiles(
   root: string,
+  preset: Preset,
   combination: TemplateCombination,
   files: Map<string, FileEntry>,
-): void {
+): Promise<void> {
   if (combination.packageManager === 'bun') {
     const preCommit = readFileSync(join(root, 'scaffold/options/bun/.githooks/pre-commit'));
     files.set('.githooks/pre-commit', { content: preCommit, mode: 0o755 });
@@ -112,9 +113,22 @@ function applyOptionFiles(
       content: readFileSync(join(root, 'scaffold/options/ts6/eslint.config.mjs')),
       mode: 0o644,
     });
+    const existing = files.get('.oxlintrc.json');
+    if (!existing) throw new Error('Missing merged .oxlintrc.json before TS6 options apply.');
+    const ts6Oxlint = parseObject(readFileSync(join(root, 'scaffold/options/ts6/.oxlintrc.json')));
+    const mergedOxlint = mergeObjects(
+      parseObject(existing.content),
+      ts6Oxlint,
+      '.oxlintrc.json',
+      preset,
+    );
     files.set('.oxlintrc.json', {
-      content: readFileSync(join(root, 'scaffold/options/ts6/.oxlintrc.json')),
-      mode: 0o644,
+      content: await jsonFile(
+        mergedOxlint,
+        join(root, 'scaffold/common/package.json'),
+        '.oxlintrc.json',
+      ),
+      mode: existing.mode,
     });
     files.delete('.oxlintrc.typed.json');
   } else {
@@ -162,7 +176,7 @@ async function composeTemplate(
     mode: 0o644,
   });
 
-  applyOptionFiles(root, combination, files);
+  await applyOptionFiles(root, preset, combination, files);
 
   const lockPath = authoritativeLockPath(combination);
   const lock = readFileSync(join(root, lockPath));

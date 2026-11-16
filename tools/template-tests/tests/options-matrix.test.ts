@@ -55,6 +55,18 @@ function minimalFixture(): string {
   };
   json(root, 'scaffold/common/package.json', manifest);
   json(root, 'scaffold/common/tsconfig.base.json', { compilerOptions: { strict: true } });
+  json(root, 'scaffold/common/.oxlintrc.json', {
+    plugins: ['typescript'],
+    rules: { 'typescript/no-explicit-any': 'error' },
+  });
+  json(root, 'scaffold/common/.oxlintrc.typed.json', {
+    extends: ['.oxlintrc.json'],
+    rules: { 'typescript/no-floating-promises': 'error' },
+  });
+  json(root, 'scaffold/presets/react/.oxlintrc.json', {
+    plugins: ['react'],
+    rules: { 'react/rules-of-hooks': 'error' },
+  });
   json(root, 'scaffold/presets.json', {
     rootPreset: 'vanilla',
     presets: ['vanilla', 'react', 'vue'].map((id) => ({ id, replaces: [], ruleOverrides: [] })),

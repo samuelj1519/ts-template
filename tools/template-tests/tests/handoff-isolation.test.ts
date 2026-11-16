@@ -40,12 +40,24 @@ function fixture(): string {
   json(root, 'scaffold/common/tsconfig.base.json', {
     compilerOptions: { target: 'ES2023', module: 'ESNext', moduleResolution: 'bundler' },
   });
+  json(root, 'scaffold/common/.oxlintrc.json', {
+    plugins: ['typescript', 'jsx-a11y'],
+    rules: { 'typescript/no-explicit-any': 'error' },
+  });
+  json(root, 'scaffold/common/.oxlintrc.typed.json', {
+    extends: ['.oxlintrc.json'],
+    rules: { 'typescript/no-floating-promises': 'error' },
+  });
   for (const id of ids) {
     json(root, `scaffold/presets/${id}/tsconfig.json`, { extends: './tsconfig.base.json' });
   }
+  json(root, 'scaffold/presets/react/.oxlintrc.json', {
+    plugins: ['react'],
+    rules: { 'react/rules-of-hooks': 'error' },
+  });
   json(root, 'scaffold/presets.json', {
     rootPreset: 'vanilla',
-    presets: ids.map((id) => ({ id, replaces: [] })),
+    presets: ids.map((id) => ({ id, replaces: [], ruleOverrides: [] })),
     options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
   });
   for (const id of ids) {

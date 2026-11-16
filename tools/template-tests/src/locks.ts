@@ -67,6 +67,27 @@ function runCommand(
   return result;
 }
 
+type NpmAuditMetadata = {
+  metadata?: { vulnerabilities?: Record<string, number> };
+  error?: unknown;
+};
+
+function npmAuditCounts(stdout: string): { high: number; critical: number } | null {
+  let metadata: NpmAuditMetadata;
+  try {
+    metadata = JSON.parse(stdout) as NpmAuditMetadata;
+  } catch {
+    return null;
+  }
+  if (metadata.error !== undefined) return null;
+  const counts = metadata.metadata?.vulnerabilities;
+  if (!counts) return null;
+  return {
+    high: Number(counts['high'] ?? 0),
+    critical: Number(counts['critical'] ?? 0),
+  };
+}
+
 function auditNpm(
   root: string,
   combination: TemplateCombination,
@@ -84,17 +105,23 @@ function auditNpm(
     combination,
     `${String(result.stdout ?? '')}\n${String(result.stderr ?? '')}\nexit: ${String(result.status)}\n`,
   );
-  let metadata: { metadata?: { vulnerabilities?: Record<string, number> } } = {};
-  try {
-    metadata = JSON.parse(result.stdout) as typeof metadata;
-  } catch {
-    blockOnAudit(root, combination, { parseError: true, stdout: result.stdout.slice(0, 500) });
+  if (result.status !== 0) {
+    blockOnAudit(root, combination, {
+      auditCommandFailed: true,
+      status: result.status,
+      stderr: String(result.stderr ?? '').slice(0, 500),
+    });
     return;
   }
-  const counts = metadata.metadata?.vulnerabilities ?? {};
-  const high = Number(counts['high'] ?? 0);
-  const critical = Number(counts['critical'] ?? 0);
-  if (high > 0 || critical > 0) blockOnAudit(root, combination, { high, critical });
+  const counts = npmAuditCounts(String(result.stdout ?? ''));
+  if (!counts) {
+    blockOnAudit(root, combination, {
+      parseError: true,
+      stdout: String(result.stdout ?? '').slice(0, 500),
+    });
+    return;
+  }
+  if (counts.high > 0 || counts.critical > 0) blockOnAudit(root, combination, counts);
 }
 
 function auditBun(
