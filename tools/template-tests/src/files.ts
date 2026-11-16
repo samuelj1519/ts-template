@@ -56,12 +56,21 @@ export function rootExcluded(path: string): boolean {
 }
 
 const templateInstallResidualRoots = new Set(['.npm', '.bun']);
+const templateRuntimeOutputRoots = new Set([
+  'dist',
+  'coverage',
+  'artifacts',
+  'reports',
+  '.stryker-tmp',
+  '.worktrees',
+]);
 
 export function templatePayloadExcluded(path: string): boolean {
   const parts = path.split('/');
   if (parts.some((part) => part === 'node_modules')) return true;
   const root = parts[0];
-  return root !== undefined && templateInstallResidualRoots.has(root);
+  if (root !== undefined && templateInstallResidualRoots.has(root)) return true;
+  return root !== undefined && templateRuntimeOutputRoots.has(root);
 }
 
 export function readFiles(root: string, exclude: (path: string) => boolean = () => false): FileMap {
