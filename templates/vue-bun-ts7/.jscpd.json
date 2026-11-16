@@ -1,0 +1,9 @@
+{
+  "threshold": 0,
+  "minLines": 8,
+  "minTokens": 60,
+  "reporters": ["console", "json"],
+  "output": "reports/duplication",
+  "ignore": ["**/*.test.ts", "**/*.test.tsx"],
+  "format": ["typescript", "tsx", "css"]
+}

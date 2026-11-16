@@ -1,3 +1,10 @@
+/**
+ * CI scheduling (plan 6.3): defaults `vanilla` / `react` / `vue` keep full install and
+ * `check:milestone` in `template.yml / defaults-milestone`. Pairwise A–F and fixed risk row G
+ * run real `check:full` via `template.yml / options-full` and `bun-risk-full` on hosted runners.
+ * This file stays maintainer-local install and milestone evidence; it is excluded from
+ * `npm run test:static` so cheap static jobs do not pull Playwright or full milestone cost.
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
@@ -136,6 +143,8 @@ function git(args: readonly string[], cwd = source) {
 function isMaintainerPath(path: string): boolean {
   return (
     maintainerPaths.has(path) ||
+    path === '.handoff' ||
+    path.startsWith('.handoff/') ||
     path === 'templates' ||
     path.startsWith('templates/') ||
     path === 'scaffold' ||

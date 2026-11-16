@@ -1,0 +1,13 @@
+node_modules/
+/dist/
+/coverage/
+/artifacts/
+/reports/
+/.stryker-tmp/
+/.worktrees/
+.env
+.env.*
+.aws/
+.private/
+*.log
+.DS_Store

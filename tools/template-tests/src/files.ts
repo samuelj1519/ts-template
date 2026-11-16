@@ -26,6 +26,7 @@ export const runtimePaths = new Set([
 const maintenancePaths = new Set([
   'CONTRIBUTING.md',
   '.github/workflows/template.yml',
+  '.handoff',
   'scaffold',
   'templates',
   'tools/template-tests',
@@ -50,7 +51,8 @@ export function realDirectory(path: string): void {
 }
 
 export function rootExcluded(path: string): boolean {
-  return runtimePaths.has(path) || maintenancePaths.has(path);
+  if (runtimePaths.has(path) || maintenancePaths.has(path)) return true;
+  return path.startsWith('.handoff/');
 }
 
 export function readFiles(root: string, exclude: (path: string) => boolean = () => false): FileMap {

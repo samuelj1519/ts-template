@@ -1,0 +1,6 @@
+{
+  "reviewBy": "2026-12-16T00:00:00Z",
+  "owner": "maintainer",
+  "reason": "TypeScript 6 compatibility is temporary until ecosystem exit criteria are met.",
+  "evidence": ".handoff/选项方案.md"
+}

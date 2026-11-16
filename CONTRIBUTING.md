@@ -4,21 +4,21 @@ The repository self-hosts the vanilla preset. Native TypeScript, React, and Vue 
 
 ## Apply the development standard
 
-Template maintenance adopts dev-standard 1.0 draft at `4ade9ed101d946633759b95271f3d42b18e66868`. Its local entry is `../../dev-standard/standard/README.md`. Read that exact version before governed work and stop affected operations if it is unavailable. Generated projects select their own standard and authorizations.
+Template maintenance adopts devnorm standard 1.0 draft at `4ade9ed101d946633759b95271f3d42b18e66868`. Its local entry is `../../devnorm/standard/README.md` (from the repository root, two levels up to `devnorm/standard/`). Read that exact version before governed work and stop affected operations if it is unavailable. Generated projects select their own standard and authorizations.
 
 For nontrivial changes, follow the requirement, scope, implementation, independent-review, acceptance, and closure stages. Record decisions and evidence in the task or review record.
 
 ## Edit authoritative inputs
 
-| Location                       | Ownership                                                                                              |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `scaffold/common/`             | Shared source, model assertions, styles, browser scenarios, checks, and generic guides.                |
-| `scaffold/presets/<preset>/`   | Native entry, UI, compiler options, build plugin, component tests, and framework dependency additions. |
-| `scaffold/presets.json`        | The finite preset registry and explicit merge permissions.                                             |
-| `scaffold/locks/<preset>.json` | The reviewed npm lock for that standalone dependency graph.                                            |
-| `tools/template-tests/`        | Assembly, generation, privacy, safety, policy, and bootstrap contracts.                                |
+| Location                     | Ownership                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `scaffold/common/`           | Shared source, model assertions, styles, browser scenarios, checks, and generic guides.                |
+| `scaffold/presets/<preset>/` | Native entry, UI, compiler options, build plugin, component tests, and framework dependency additions. |
+| `scaffold/presets.json`      | The finite preset registry and explicit merge permissions.                                             |
+| `scaffold/locks/<preset>/`   | Reviewed npm or Bun locks per package-manager and TypeScript major option.                             |
+| `tools/template-tests/`      | Assembly, generation, privacy, safety, policy, and bootstrap contracts.                                |
 
-Edit these inputs first. The root core and `templates/` payloads are generated mirrors. Assembly rejects unknown registry fields, unsafe paths, source links, undeclared file collisions, and conflicting dependency versions. The root package remains exactly the vanilla package; maintainer commands live in the isolated test host.
+Edit these inputs first. The root core and `templates/` payloads are generated mirrors. Do not hand-edit the twelve committed directories under `templates/`; change `scaffold/` (and related locks or generator code) and run `npm run templates:sync --prefix tools/template-tests`. Assembly rejects unknown registry fields, unsafe paths, source links, undeclared file collisions, and conflicting dependency versions. The root package remains exactly the vanilla package; maintainer commands live in the isolated test host.
 
 Each root or payload has one ordinary manifest and lockfile. The three authoritative locks represent different generated projects.
 

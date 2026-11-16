@@ -1,6 +1,15 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { z } from 'zod';
 import {
   compareFiles,
@@ -15,12 +24,17 @@ import {
 import type { FileEntry, FileMap } from './files.ts';
 import { canonicalJson, jsonFile, mergeObjects, parseObject } from './merge.ts';
 import type { JsonObject } from './merge.ts';
+import { authoritativeLockPath, templateDirectoryId, transformManifest } from './options.ts';
 import { presetIdSchema, readRegistry } from './registry.ts';
-import type { Preset, PresetId } from './registry.ts';
+import type { Preset, PresetId, TemplateCombination } from './registry.ts';
 
 export type Composition = {
   readonly rootPreset: 'vanilla';
-  readonly presets: readonly { readonly id: PresetId; readonly files: FileMap }[];
+  readonly templates: readonly {
+    readonly id: string;
+    readonly combination: TemplateCombination;
+    readonly files: FileMap;
+  }[];
 };
 const packageSchema = z.object({
   name: z.literal('frontend-project'),
@@ -36,8 +50,12 @@ function inputs(root: string, id: PresetId) {
   const common = readFiles(join(root, 'scaffold/common'));
   const overlay = readFiles(join(root, 'scaffold/presets', id));
   for (const path of [...common.keys(), ...overlay.keys()]) {
+    if (path.split('/').some((part) => part === '.handoff')) {
+      throw new Error(`Unapproved generation input: ${path}`);
+    }
     if (
       path === 'package-lock.json' ||
+      path === 'bun.lock' ||
       path
         .split('/')
         .some((_, index, parts) => rootExcluded(parts.slice(0, index + 1).join('/'))) ||
@@ -68,15 +86,49 @@ function mergedPackage(common: FileMap, overlay: FileMap, preset: Preset): JsonO
   return merged;
 }
 
-export async function composePackage(root: string, id: PresetId): Promise<JsonObject> {
-  const preset = readRegistry(root).presets.find((entry) => entry.id === id);
-  if (!preset) throw new Error(`Unknown preset: ${id}`);
-  const { common, overlay } = inputs(root, id);
-  return mergedPackage(common, overlay, preset);
+export async function composePackage(
+  root: string,
+  combination: TemplateCombination,
+): Promise<JsonObject> {
+  const preset = readRegistry(root).presets.find((entry) => entry.id === combination.preset);
+  if (!preset) throw new Error(`Unknown preset: ${combination.preset}`);
+  const { common, overlay } = inputs(root, combination.preset);
+  const manifest = transformManifest(mergedPackage(common, overlay, preset), combination);
+  packageSchema.parse(manifest);
+  return manifest;
 }
 
-async function composePreset(root: string, preset: Preset): Promise<FileMap> {
-  const { common, overlay } = inputs(root, preset.id);
+function applyOptionFiles(
+  root: string,
+  combination: TemplateCombination,
+  files: Map<string, FileEntry>,
+): void {
+  if (combination.packageManager === 'bun') {
+    const preCommit = readFileSync(join(root, 'scaffold/options/bun/.githooks/pre-commit'));
+    files.set('.githooks/pre-commit', { content: preCommit, mode: 0o755 });
+  }
+  if (combination.typescriptMajor === 6) {
+    files.set('eslint.config.mjs', {
+      content: readFileSync(join(root, 'scaffold/options/ts6/eslint.config.mjs')),
+      mode: 0o644,
+    });
+    files.set('.oxlintrc.json', {
+      content: readFileSync(join(root, 'scaffold/options/ts6/.oxlintrc.json')),
+      mode: 0o644,
+    });
+    files.delete('.oxlintrc.typed.json');
+  } else {
+    files.delete('eslint.config.mjs');
+  }
+  if (combination.typescriptMajor === 7) files.delete('ts6-review.json');
+}
+
+async function composeTemplate(
+  root: string,
+  preset: Preset,
+  combination: TemplateCombination,
+): Promise<FileMap> {
+  const { common, overlay } = inputs(root, combination.preset);
   const files = new Map(common);
   const replaced = new Set<string>();
   for (const [path, entry] of overlay) {
@@ -103,20 +155,31 @@ async function composePreset(root: string, preset: Preset): Promise<FileMap> {
   }
   if (preset.replaces.some((path) => !replaced.has(path)))
     throw new Error(`Unused file replacement in ${preset.id}.`);
-  const manifest = mergedPackage(common, overlay, preset);
+
+  const manifest = transformManifest(mergedPackage(common, overlay, preset), combination);
   files.set('package.json', {
     content: await jsonFile(manifest, join(root, 'scaffold/common/package.json')),
     mode: 0o644,
   });
-  const locks = readFiles(join(root, 'scaffold/locks'));
-  const lock = locks.get(`${preset.id}.json`);
-  if (!lock) throw new Error(`Missing authoritative lock for ${preset.id}.`);
-  validateLock(parseObject(lock.content), manifest);
-  files.set('package-lock.json', lock);
+
+  applyOptionFiles(root, combination, files);
+
+  const lockPath = authoritativeLockPath(combination);
+  const lock = readFileSync(join(root, lockPath));
+  if (combination.packageManager === 'npm') {
+    validateNpmLock(parseObject(lock), manifest);
+    files.set('package-lock.json', { content: lock, mode: 0o644 });
+    files.delete('bun.lock');
+  } else {
+    validateBunLock(lock, manifest);
+    files.set('bun.lock', { content: lock, mode: 0o644 });
+    files.delete('package-lock.json');
+  }
+
   return new Map([...files].sort(([left], [right]) => left.localeCompare(right)));
 }
 
-export function validateLock(lock: JsonObject, manifest: JsonObject): void {
+export function validateNpmLock(lock: JsonObject, manifest: JsonObject): void {
   const parsed = z
     .object({
       name: z.string(),
@@ -135,6 +198,29 @@ export function validateLock(lock: JsonObject, manifest: JsonObject): void {
   }
 }
 
+export function validateBunLock(lock: Buffer, manifest: JsonObject): void {
+  const parsed = z
+    .object({
+      workspaces: z.object({
+        '': z.object({
+          name: z.string(),
+          devDependencies: z.record(z.string(), z.string()).optional(),
+          dependencies: z.record(z.string(), z.string()).optional(),
+        }),
+      }),
+    })
+    .safeParse(parseJsonc(lock.toString('utf8'), [], { allowTrailingComma: true }));
+  if (!parsed.success) throw new Error('Bun lock must be JSON with a workspace root entry.');
+  const root = parsed.data.workspaces[''];
+  if (root.name !== manifest['name'])
+    throw new Error('Bun lock identity does not match its manifest.');
+  for (const key of ['dependencies', 'devDependencies'] as const) {
+    const empty = {};
+    if (canonicalJson(root[key] ?? empty) !== canonicalJson(manifest[key] ?? empty))
+      throw new Error(`Bun lock root does not match manifest: ${key}`);
+  }
+}
+
 export async function composeRepository(root: string): Promise<Composition> {
   const registry = readRegistry(root);
   const ids = registry.presets.map((preset) => preset.id);
@@ -145,21 +231,32 @@ export async function composeRepository(root: string): Promise<Composition> {
     )
   )
     throw new Error('Unexpected preset input directory.');
-  const presets = [];
-  for (const preset of registry.presets)
-    presets.push({ id: preset.id, files: await composePreset(root, preset) });
-  return { rootPreset: registry.rootPreset, presets };
+  const templates = [];
+  for (const combination of registry.combinations) {
+    const preset = registry.presets.find((entry) => entry.id === combination.preset);
+    if (!preset) throw new Error(`Missing preset: ${combination.preset}`);
+    templates.push({
+      id: templateDirectoryId(combination),
+      combination,
+      files: await composeTemplate(root, preset, combination),
+    });
+  }
+  return { rootPreset: registry.rootPreset, templates };
 }
 
 export async function checkTemplates(root: string): Promise<void> {
   const composition = await composeRepository(root);
   const output = join(root, 'templates');
   realDirectory(output);
-  if (readdirSync(output).length !== composition.presets.length)
-    throw new Error('Complete preset output directories differ.');
-  for (const preset of composition.presets)
-    compareFiles(readFiles(join(output, preset.id)), preset.files, `templates/${preset.id}`);
-  const selected = composition.presets.find((preset) => preset.id === composition.rootPreset);
+  const expectedIds = new Set(composition.templates.map((entry) => entry.id));
+  const actual = readdirSync(output);
+  if (actual.length !== composition.templates.length)
+    throw new Error('Complete template output directories differ.');
+  if (actual.some((name) => !expectedIds.has(name)))
+    throw new Error('Unknown generated output directory.');
+  for (const template of composition.templates)
+    compareFiles(readFiles(join(output, template.id)), template.files, `templates/${template.id}`);
+  const selected = composition.templates.find((entry) => entry.id === composition.rootPreset);
   if (!selected) throw new Error('Root preset is missing.');
   compareFiles(readFiles(root, rootExcluded), selected.files, 'Root bootstrap');
 }
@@ -200,33 +297,33 @@ function validateRootOwnership(root: string, expected: FileMap): void {
 
 export async function syncTemplates(root: string): Promise<void> {
   const composition = await composeRepository(root);
-  const selected = composition.presets.find((preset) => preset.id === composition.rootPreset);
+  const selected = composition.templates.find((entry) => entry.id === composition.rootPreset);
   if (!selected) throw new Error('Root preset is missing.');
   const stale = staleRootFiles(root, selected.files);
   const output = join(root, 'templates');
+  const expectedIds = new Set(composition.templates.map((entry) => entry.id));
   if (lstatIfPresent(output)) {
     realDirectory(output);
-    if (
-      readdirSync(output).some((name) => !composition.presets.some((preset) => preset.id === name))
-    )
+    if (readdirSync(output).some((name) => !expectedIds.has(name)))
       throw new Error('Unknown generated output directory.');
   }
   validateDestination(root, selected.files);
   validateRootOwnership(root, selected.files);
-  for (const preset of composition.presets) {
-    const destination = join(output, preset.id);
+  for (const template of composition.templates) {
+    const destination = join(output, template.id);
     if (lstatIfPresent(destination)) readFiles(destination);
   }
   const stage = mkdtempSync(join(tmpdir(), 'frontend-preset-stage-'));
   try {
-    for (const preset of composition.presets) writeFiles(join(stage, preset.id), preset.files);
+    for (const template of composition.templates)
+      writeFiles(join(stage, template.id), template.files);
     for (const path of stale) rmSync(path);
     writeFiles(root, selected.files);
     mkdirSync(output, { recursive: true });
-    for (const preset of composition.presets) {
-      const destination = join(output, preset.id);
+    for (const template of composition.templates) {
+      const destination = join(output, template.id);
       rmSync(destination, { recursive: true, force: true });
-      cpSync(join(stage, preset.id), destination, { recursive: true, dereference: false });
+      cpSync(join(stage, template.id), destination, { recursive: true, dereference: false });
     }
   } finally {
     rmSync(stage, { recursive: true, force: true });

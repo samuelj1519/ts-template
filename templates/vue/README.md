@@ -4,13 +4,39 @@ A frontend project with strict TypeScript, executable architecture rules, tests,
 
 ## Create a project
 
-Use a committed `ts-template` source checkout on `main`. Choose one command and replace the source path with that checkout's absolute path:
+Use a committed `ts-template` source checkout on `main`. Replace `/absolute/path/to/ts-template` with your checkout. Each Giget path selects preset, package manager, and TypeScript major. Defaults are npm 12.2.2 with TypeScript 7.0.2 (`templates/vanilla`, `templates/react`, `templates/vue`).
 
 ```sh
 npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vanilla' my-app
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vanilla-npm-ts6' my-app-ts6
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vanilla-bun-ts7' my-app-bun
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vanilla-bun-ts6' my-app-bun-ts6
+
 npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/react' my-react-app
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/react-npm-ts6' my-react-ts6
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/react-bun-ts7' my-react-bun
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/react-bun-ts6' my-react-bun-ts6
+
 npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vue' my-vue-app
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vue-npm-ts6' my-vue-ts6
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vue-bun-ts7' my-vue-bun
+npm exec --yes --package=giget@3.3.1 -- giget 'git:/absolute/path/to/ts-template#main:templates/vue-bun-ts6' my-vue-bun-ts6
 ```
+
+| Giget path suffix | Preset  | Package manager | TypeScript |
+| ----------------- | ------- | --------------- | ---------- |
+| `vanilla`         | vanilla | npm (default)   | 7          |
+| `vanilla-npm-ts6` | vanilla | npm             | 6          |
+| `vanilla-bun-ts7` | vanilla | Bun 1.3.11      | 7          |
+| `vanilla-bun-ts6` | vanilla | Bun             | 6          |
+| `react`           | react   | npm (default)   | 7          |
+| `react-npm-ts6`   | react   | npm             | 6          |
+| `react-bun-ts7`   | react   | Bun             | 7          |
+| `react-bun-ts6`   | react   | Bun             | 6          |
+| `vue`             | vue     | npm (default)   | 7          |
+| `vue-npm-ts6`     | vue     | npm             | 6          |
+| `vue-bun-ts7`     | vue     | Bun             | 7          |
+| `vue-bun-ts6`     | vue     | Bun             | 6          |
 
 | Preset    | Application style                                                     |
 | --------- | --------------------------------------------------------------------- |
@@ -26,12 +52,14 @@ The private package name is independent of the destination directory. If you ren
 
 ## Develop
 
-Use Node.js 26.13.1 and npm 12.2.2. From the generated project:
+Use Node.js 26.13.1. npm templates use npm 12.2.2; Bun templates use Bun 1.3.11 for installs and `bun run` script dispatch while Node still runs the engineering tools. From the generated project:
 
 ```sh
 npm ci
 npm run dev
 ```
+
+For a Bun template, replace `npm ci` with `bun install --frozen-lockfile` and use `bun run <script>` for the scripts listed in `package.json`.
 
 Open Vite's printed URL. The example normalizes whitespace as you type and resets the input with keyboard focus restored.
 
