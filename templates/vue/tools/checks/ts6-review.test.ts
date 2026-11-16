@@ -24,7 +24,7 @@ void test('ts6 review dates: before, equal, after and missing', () => {
   try {
     writeReview(root, '2026-12-16T00:00:00Z');
     assert.throws(() => enforceTs6Review(root, 'maintainer', new Date('2026-12-17T00:00:00Z')));
-    enforceTs6Review(root, 'project', new Date('2026-12-17T00:00:00Z'));
+    assert.throws(() => enforceTs6Review(root, 'project', new Date('2026-12-17T00:00:00Z')));
     enforceTs6Review(root, 'maintainer', new Date('2026-11-16T00:00:00Z'));
     rmSync(join(root, 'ts6-review.json'));
     assert.throws(() => loadTs6Review(root), /Missing ts6-review.json/u);

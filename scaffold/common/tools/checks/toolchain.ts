@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { enforceTs6Review } from './ts6-review.ts';
+import { validateTs6TypeAwareRules } from './ts6-type-aware-rules.ts';
 import { validateLockUniqueness } from './lock-policy.ts';
 import { validateStrykerTsconfigField } from './stryker-policy.ts';
 import { validateTsConfigPolicy } from './tsconfig-policy.ts';
@@ -13,17 +14,20 @@ function usesTypeScript6(projectRoot: string): boolean {
   return version?.startsWith('6.') === true;
 }
 
-export function runToolchainChecks(
+export async function runToolchainChecks(
   projectRoot: string,
   mode: 'project' | 'maintainer' = 'project',
-): void {
+): Promise<void> {
   validateStrykerTsconfigField(join(projectRoot, 'stryker.config.json'));
-  if (usesTypeScript6(projectRoot)) enforceTs6Review(projectRoot, mode);
+  if (usesTypeScript6(projectRoot)) {
+    enforceTs6Review(projectRoot, mode);
+    await validateTs6TypeAwareRules(projectRoot);
+  }
   validateTsConfigPolicy(projectRoot);
   validateLockUniqueness(projectRoot);
 }
 
 if (import.meta.main) {
-  runToolchainChecks(process.cwd(), 'project');
-  process.stdout.write('Toolchain: stryker, tsconfig, lock and TS6 review checks passed.\n');
+  await runToolchainChecks(process.cwd(), 'project');
+  process.stdout.write('Toolchain: stryker, tsconfig, lock and TS6 checks passed.\n');
 }

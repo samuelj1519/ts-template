@@ -45,8 +45,7 @@ export function evaluateTs6Review(reviewBy: Date, now: Date, mode: Ts6ReviewMode
     ? `TypeScript 6 compatibility review expired at ${reviewBy.toISOString()}. See ${warningLink} before extending support.`
     : `TypeScript 6 compatibility is temporary until ${reviewBy.toISOString()}. Plan the exit review: ${warningLink}`;
   if (expired) {
-    if (mode === 'maintainer') return { status: 'expired', reviewBy, message };
-    return { status: 'warning', reviewBy, message };
+    return { status: 'expired', reviewBy, message };
   }
   if (mode === 'project') return { status: 'warning', reviewBy, message };
   return { status: 'ok', reviewBy };

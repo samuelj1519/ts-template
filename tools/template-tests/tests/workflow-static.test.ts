@@ -8,18 +8,53 @@ import { readRegistry } from '../src/registry.ts';
 const repository = fileURLToPath(new URL('../../..', import.meta.url));
 const workflow = readFileSync(join(repository, '.github/workflows/template.yml'), 'utf8');
 
-void test('template workflow defines required contract jobs', () => {
-  for (const job of [
-    'static:',
-    'contracts:',
-    'options-full:',
-    'defaults-full:',
-    'compatibility-review:',
-    'defaults-milestone:',
-    'bun-risk-full:',
-  ]) {
+const REQUIRED_JOBS = [
+  'static:',
+  'contracts:',
+  'twelve-check:',
+  'defaults-full-cross:',
+  'defaults-milestone:',
+  'npm-audit-advisory:',
+] as const;
+
+const REMOVED_JOBS = [
+  'pairwise-static:',
+  'options-full:',
+  'defaults-full:',
+  'bun-risk-full:',
+  'compatibility-review:',
+] as const;
+
+void test('template workflow defines simplified acceptance jobs', () => {
+  for (const job of REQUIRED_JOBS) {
     assert.match(workflow, new RegExp(`\\n  ${job.replace(':', '\\:')}`));
   }
+  for (const job of REMOVED_JOBS) {
+    assert.doesNotMatch(workflow, new RegExp(`\\n  ${job.replace(':', '\\:')}`));
+  }
+});
+
+void test('twelve-check matrix lists every template directory once', () => {
+  const block = workflow.slice(
+    workflow.indexOf('twelve-check:'),
+    workflow.indexOf('defaults-full-cross:'),
+  );
+  const expected = [...readRegistry(repository).templateIds].sort();
+  const matrix = block.slice(block.indexOf('template:'), block.indexOf('runs-on:'));
+  for (const id of expected) {
+    assert.match(matrix, new RegExp(`- ${id}\\b`));
+  }
+  assert.equal((matrix.match(/^\s+- [a-z]/gm) ?? []).length, 12);
+});
+
+void test('defaults-full-cross only targets macOS and Windows default presets', () => {
+  const block = workflow.slice(
+    workflow.indexOf('defaults-full-cross:'),
+    workflow.indexOf('defaults-milestone:'),
+  );
+  assert.match(block, /os: \[macos-latest, windows-latest\]/);
+  assert.match(block, /template: \[vanilla, react, vue\]/);
+  assert.match(block, /npm run check:full/);
 });
 
 void test('static enumerate step uses sorted twelve-way comparison', () => {
@@ -29,11 +64,4 @@ void test('static enumerate step uses sorted twelve-way comparison', () => {
   const actual = readdirSync(join(repository, 'templates')).sort();
   assert.equal(expected.length, 12);
   assert.deepEqual(expected, actual);
-});
-
-void test('bun-risk-full does not run npm ci in bun template', () => {
-  const section = workflow.slice(workflow.indexOf('bun-risk-full:'));
-  const gBlock = section.slice(0, section.indexOf('defaults-milestone:'));
-  assert.doesNotMatch(gBlock, /npm ci/);
-  assert.match(gBlock, /bun install --frozen-lockfile/u);
 });

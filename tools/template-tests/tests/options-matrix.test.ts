@@ -7,11 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { checkTemplates, composeRepository, syncTemplates } from '../src/assembly.ts';
 import { compareFiles, readFiles, rootExcluded } from '../src/files.ts';
 import { templateDirectoryId } from '../src/options.ts';
-import {
-  assertSixteenPairwisePairs,
-  PAIRWISE_FULL_SCHEDULE,
-  pairwiseTemplatePath,
-} from '../src/pairwise.ts';
 import { parseCombinationInput, readRegistry } from '../src/registry.ts';
 import { bunLockStub, npmLockStub } from './lock-stubs.ts';
 
@@ -127,26 +122,6 @@ void test('unknown combination triples are rejected', () => {
     assert.throws(() => readRegistry(root), /Expected exactly 12/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
-  }
-});
-
-void test('pairwise schedule lists rows A through G with stable template paths', () => {
-  assert.deepEqual(
-    PAIRWISE_FULL_SCHEDULE.map((row) => row.id),
-    ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
-  );
-  const g = PAIRWISE_FULL_SCHEDULE.find((row) => row.id === 'G');
-  assert.ok(g);
-  assert.equal(pairwiseTemplatePath(g), 'vue-bun-ts6');
-  assertSixteenPairwisePairs();
-});
-
-void test('registry combinations include every pairwise scheduled template directory', () => {
-  const registry = readRegistry(join(dirname(fileURLToPath(import.meta.url)), '../../..'));
-  const ids = new Set(registry.templateIds);
-  for (const row of PAIRWISE_FULL_SCHEDULE) {
-    const directory = pairwiseTemplatePath(row);
-    assert.equal(ids.has(directory), true, `Missing scheduled template directory: ${directory}`);
   }
 });
 

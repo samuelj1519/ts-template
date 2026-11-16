@@ -23,6 +23,22 @@ import {
 } from './files.ts';
 import type { FileEntry, FileMap } from './files.ts';
 import { canonicalJson, jsonFile, mergeObjects, parseObject } from './merge.ts';
+
+const MAINTAINER_ROOT_SCRIPT_KEYS = ['templates:verify'] as const;
+
+function withoutMaintainerRootScripts(files: FileMap): FileMap {
+  const entry = files.get('package.json');
+  if (!entry) return files;
+  const manifest = JSON.parse(entry.content.toString('utf8')) as {
+    scripts?: Record<string, string>;
+  };
+  const scripts = { ...manifest.scripts };
+  for (const key of MAINTAINER_ROOT_SCRIPT_KEYS) delete scripts[key];
+  const normalized = Buffer.from(JSON.stringify({ ...manifest, scripts }, null, 2) + '\n', 'utf8');
+  const clone = new Map(files);
+  clone.set('package.json', { content: normalized, mode: entry.mode });
+  return clone;
+}
 import type { JsonObject } from './merge.ts';
 import { authoritativeLockPath, templateDirectoryId, transformManifest } from './options.ts';
 import { presetIdSchema, readRegistry } from './registry.ts';
@@ -272,7 +288,11 @@ export async function checkTemplates(root: string): Promise<void> {
     compareFiles(readFiles(join(output, template.id)), template.files, `templates/${template.id}`);
   const selected = composition.templates.find((entry) => entry.id === composition.rootPreset);
   if (!selected) throw new Error('Root preset is missing.');
-  compareFiles(readFiles(root, rootExcluded), selected.files, 'Root bootstrap');
+  compareFiles(
+    withoutMaintainerRootScripts(readFiles(root, rootExcluded)),
+    selected.files,
+    'Root bootstrap',
+  );
 }
 
 function staleRootFiles(root: string, expected: FileMap): string[] {
@@ -293,6 +313,15 @@ function staleRootFiles(root: string, expected: FileMap): string[] {
   return stale;
 }
 
+function rootComparableEntry(path: string, current: FileEntry): FileEntry {
+  if (path !== 'package.json') return current;
+  const normalized = withoutMaintainerRootScripts(new Map([['package.json', current]])).get(
+    'package.json',
+  );
+  if (!normalized) throw new Error('Unable to normalize root package.json.');
+  return normalized;
+}
+
 function validateRootOwnership(root: string, expected: FileMap): void {
   const directory = join(root, 'templates/vanilla');
   const previous = existsSync(directory) ? readFiles(directory) : new Map<string, FileEntry>();
@@ -303,9 +332,11 @@ function validateRootOwnership(root: string, expected: FileMap): void {
     );
     if (!current) throw new Error(`Unable to inspect root output: ${path}`);
     if (sameEntry(current, entry)) continue;
+    const comparable = rootComparableEntry(path, current);
     const owned = previous.get(path);
-    if (!owned || !sameEntry(current, owned))
-      throw new Error(`Refusing to overwrite changed or unowned root file: ${path}`);
+    if (owned && sameEntry(comparable, owned)) continue;
+    if (sameEntry(comparable, entry)) continue;
+    throw new Error(`Refusing to overwrite changed or unowned root file: ${path}`);
   }
 }
 

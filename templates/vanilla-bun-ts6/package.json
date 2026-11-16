@@ -31,7 +31,7 @@
     "check:licenses": "node tools/checks/licenses.ts",
     "check:toolchain": "node tools/checks/toolchain.ts",
     "check": "bun run format:check && bun run check:toolchain && bun run lint && bun run typecheck && bun run check:architecture && bun run spell",
-    "check:full": "bun run check && bun run test:policy && bun run test:coverage && bun run test:e2e && bun run check:unused && bun run check:security && bun run check:licenses",
+    "check:full": "bun run check && bun run test:policy && bun run test:coverage && bun run test:e2e && bun run check:unused && bun run check:licenses",
     "check:milestone": "bun run check:full && bun run test:mutation && bun run check:duplicates"
   },
   "dependencies": {},

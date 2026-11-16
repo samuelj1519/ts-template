@@ -1,7 +1,7 @@
 /**
- * CI scheduling (plan 6.3): `template.yml / contracts` runs this full suite on three systems.
- * Defaults use `defaults-full` and `defaults-milestone`; pairwise B–G use `options-full` and
- * G additionally uses `bun-risk-full` on push. This file stays the behavioral contract source;
+ * CI scheduling (simplified acceptance): `template.yml / contracts` runs this full suite on three
+ * systems. Defaults use `defaults-full-cross` and `defaults-milestone`; all twelve payloads use
+ * `twelve-check` with frozen install and `check`. This file stays the behavioral contract source;
  * `npm run test:static` stays cheap and excludes it.
  */
 import assert from 'node:assert/strict';

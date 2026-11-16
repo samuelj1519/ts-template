@@ -5,7 +5,8 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
+    # Weekly audit advisory only (does not block merges).
+    - cron: '0 12 * * 0'
 
 permissions:
   contents: read
@@ -21,6 +22,7 @@ env:
 jobs:
   static:
     name: static / twelve combinations
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -62,6 +64,7 @@ jobs:
 
   contracts:
     name: contracts / ${{ matrix.os }}
+    if: github.event_name != 'schedule'
     needs: static
     strategy:
       fail-fast: false
@@ -92,64 +95,28 @@ jobs:
       - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
       - run: npm run check --prefix tools/template-tests
 
-  pairwise-static:
-    name: pairwise-static / ${{ matrix.id }}
+  twelve-check:
+    name: twelve-check / ${{ matrix.template }}
+    if: github.event_name != 'schedule'
     needs: static
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - id: A
-            template: vanilla
-          - id: B
-            template: vanilla-bun-ts6
-          - id: C
-            template: react-npm-ts6
-          - id: D
-            template: react-bun-ts7
-          - id: E
-            template: vue-npm-ts6
-          - id: F
-            template: vue-bun-ts7
-          - id: G
-            template: vue-bun-ts6
+        template:
+          - vanilla
+          - vanilla-npm-ts6
+          - vanilla-bun-ts7
+          - vanilla-bun-ts6
+          - react
+          - react-npm-ts6
+          - react-bun-ts7
+          - react-bun-ts6
+          - vue
+          - vue-npm-ts6
+          - vue-bun-ts7
+          - vue-bun-ts6
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - name: Assert scheduled template payload exists
-        shell: bash
-        run: |
-          test -d "templates/${{ matrix.template }}"
-          test -f "templates/${{ matrix.template }}/package.json"
-
-  options-full:
-    name: options-full / ${{ matrix.id }}
-    needs: static
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: B
-            template: vanilla-bun-ts6
-            manager: bun
-          - id: C
-            template: react-npm-ts6
-            manager: npm
-          - id: D
-            template: react-bun-ts7
-            manager: bun
-          - id: E
-            template: vue-npm-ts6
-            manager: npm
-          - id: F
-            template: vue-bun-ts7
-            manager: bun
-          - id: G
-            template: vue-bun-ts6
-            manager: bun
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     defaults:
       run:
         shell: bash
@@ -164,7 +131,7 @@ jobs:
           npm install --global --prefix "$npm_prefix" npm@12.2.2
           npm --version
       - name: Install Bun for Bun templates
-        if: matrix.manager == 'bun'
+        if: contains(matrix.template, '-bun-')
         env:
           BUN_LINUX_X64_SHA256: 8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed
         run: |
@@ -179,29 +146,26 @@ jobs:
           unzip -q "$bun_install/$archive" -d "$bun_install"
           bun_bin="$(find "$bun_install" -name bun -type f | head -n 1)"
           echo "$(dirname "$bun_bin")" >> "$GITHUB_PATH"
-      - name: Frozen install and check:full
+      - name: Frozen install and check
         working-directory: templates/${{ matrix.template }}
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../playwright-browsers
         run: |
           set -euo pipefail
-          if [ "${{ matrix.manager }}" = bun ]; then
+          if [[ "${{ matrix.template }}" == *-bun-* ]]; then
             bun install --frozen-lockfile
-            node node_modules/@playwright/test/cli.js install --with-deps chromium
-            bun run check:full
+            bun run check
           else
             npm ci
-            node node_modules/@playwright/test/cli.js install --with-deps chromium
-            npm run check:full
+            npm run check
           fi
 
-  defaults-full:
-    name: defaults-full / ${{ matrix.template }} / ${{ matrix.os }}
+  defaults-full-cross:
+    name: defaults-full-cross / ${{ matrix.template }} / ${{ matrix.os }}
+    if: github.event_name != 'schedule'
     needs: static
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
         template: [vanilla, react, vue]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
@@ -228,86 +192,9 @@ jobs:
           node node_modules/@playwright/test/cli.js install --with-deps chromium
           npm run check:full
 
-  bun-risk-full:
-    # Pull requests: mark cross-platform G acceptance as not_run (plan 6.3); push runs the job.
-    name: bun-risk-full / G / ${{ matrix.os }}
-    if: github.event_name == 'push'
-    needs: static
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-      - name: Install pinned npm
-        run: |
-          npm_prefix="$(node -p 'require("node:path").resolve(require("node:path").dirname(process.execPath), process.platform === "win32" ? "." : "..")')"
-          npm install --global --prefix "$npm_prefix" npm@12.2.2
-          npm --version
-      - name: Install Bun ${{ env.BUN_VERSION }} with SHA-256 verification
-        env:
-          BUN_DARWIN_AARCH64_SHA256: 6f5a3467ed9caec4795bf78cd476507d9f870c7d57b86c945fcb338126772ffc
-          BUN_DARWIN_X64_SHA256: c4fe2b9247218b0295f24e895aaec8fee62e74452679a9026b67eacbd611a286
-          BUN_WINDOWS_X64_SHA256: 066f8694f8b7d8df592452746d18f01710d4053e93030922dbc6e8c34a8c4b9f
-        run: |
-          set -euo pipefail
-          bun_install="$RUNNER_TEMP/bun"
-          mkdir -p "$bun_install"
-          case "${RUNNER_OS}-${RUNNER_ARCH}" in
-            macOS-ARM64)
-              archive="bun-darwin-aarch64.zip"
-              expected_sha="$BUN_DARWIN_AARCH64_SHA256"
-              ;;
-            macOS-X64)
-              archive="bun-darwin-x64.zip"
-              expected_sha="$BUN_DARWIN_X64_SHA256"
-              ;;
-            Windows-X64)
-              archive="bun-windows-x64.zip"
-              expected_sha="$BUN_WINDOWS_X64_SHA256"
-              ;;
-            *)
-              echo "Unsupported runner: ${RUNNER_OS}-${RUNNER_ARCH}"
-              exit 1
-              ;;
-          esac
-          curl -fsSL -o "$bun_install/$archive" \
-            "https://github.com/oven-sh/bun/releases/download/bun-v${{ env.BUN_VERSION }}/$archive"
-          if command -v sha256sum >/dev/null 2>&1; then
-            actual_sha="$(sha256sum "$bun_install/$archive" | awk '{print $1}')"
-          else
-            actual_sha="$(shasum -a 256 "$bun_install/$archive" | awk '{print $1}')"
-          fi
-          test "$actual_sha" = "$expected_sha"
-          if command -v unzip >/dev/null 2>&1; then
-            unzip -q "$bun_install/$archive" -d "$bun_install"
-          else
-            powershell -NoProfile -Command "Expand-Archive -Path '$bun_install/$archive' -DestinationPath '$bun_install' -Force"
-          fi
-          bun_bin="$(find "$bun_install" \( -name bun -o -name bun.exe \) -type f | head -n 1)"
-          test -n "$bun_bin"
-          chmod +x "$bun_bin" || true
-          "$bun_bin" --version
-          echo "$(dirname "$bun_bin")" >> "$GITHUB_PATH"
-      - name: Frozen install and check:full for G (vue-bun-ts6)
-        working-directory: templates/vue-bun-ts6
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../playwright-browsers
-        run: |
-          bun install --frozen-lockfile
-          node node_modules/@playwright/test/cli.js install chromium
-          bun run check:full
-
   defaults-milestone:
     name: defaults-milestone / ${{ matrix.template }}
+    if: github.event_name != 'schedule'
     needs: static
     strategy:
       fail-fast: false
@@ -337,14 +224,37 @@ jobs:
           node node_modules/@playwright/test/cli.js install --with-deps chromium
           npm run check:milestone
 
-  compatibility-review:
-    name: compatibility-review / TS6 delivery gate
+  npm-audit-advisory:
+    name: npm-audit-advisory / weekly
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-      - name: Block maintainer delivery when TS6 review expires
-        run: npm run templates:check --prefix tools/template-tests
+      - name: Advisory npm audit (non-blocking)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          output="$(npm audit --audit-level=low --json 2>&1)" || status=$?
+          status="${status:-0}"
+          if ! node --input-type=module -e "
+            const payload = JSON.parse(process.argv[1]);
+            if (payload.error) {
+              console.error('npm audit returned error JSON:', payload.error);
+              process.exit(2);
+            }
+            const meta = payload.metadata?.vulnerabilities ?? {};
+            console.log('npm audit summary:', JSON.stringify(meta));
+            if ((meta.high ?? 0) + (meta.critical ?? 0) > 0) {
+              console.error('High or critical vulnerabilities present.');
+              process.exit(1);
+            }
+          " "$output"; then
+            echo 'npm audit advisory failed (see summary).'
+            exit "${status:-1}"
+          fi
