@@ -193,6 +193,13 @@ function validateConfigObject(path: string, config: JsonObject): void {
   if (config['references'] !== undefined) validateReferences(path, config['references']);
 }
 
+function extendsEntries(value: unknown): unknown[] {
+  if (value === undefined) return [];
+  if (typeof value === 'string' || Array.isArray(value))
+    return typeof value === 'string' ? [value] : value;
+  throw new Error('tsconfig extends must be a string or an array of strings.');
+}
+
 function resolveConfigChain(
   path: string,
   visited: Set<string>,
@@ -201,15 +208,21 @@ function resolveConfigChain(
   const canonical = resolve(path);
   if (visited.has(canonical)) throw new Error(`Circular tsconfig chain at ${path}.`);
   visited.add(canonical);
-  const config = load(path);
-  validateConfigObject(path, config);
-  const parent = stringValue(config['extends']);
-  if (parent) {
-    const base = parent.startsWith('.') ? resolve(dirname(path), parent) : parent;
-    if (!existsSync(base)) throw new Error(`${path}: could not resolve extends target ${parent}.`);
-    resolveConfigChain(base, visited, load);
+  try {
+    const config = load(path);
+    validateConfigObject(path, config);
+    for (const entry of extendsEntries(config['extends'])) {
+      const parent = stringValue(entry);
+      if (!parent) throw new Error(`${path}: each extends entry needs a string path.`);
+      const base = parent.startsWith('.') ? resolve(dirname(path), parent) : parent;
+      if (!existsSync(base))
+        throw new Error(`${path}: could not resolve extends target ${parent}.`);
+      resolveConfigChain(base, visited, load);
+    }
+    resolveReferences(path, config['references'], visited, load);
+  } finally {
+    visited.delete(canonical);
   }
-  resolveReferences(path, config['references'], visited, load);
 }
 
 export function validateTsConfigPolicy(projectRoot: string, entry = 'tsconfig.json'): void {

@@ -60,3 +60,33 @@ void test('tsconfig policy rejects inherited and direct violations', () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+void test('tsconfig policy validates every array extends entry', () => {
+  const root = mkdtempSync(join(tmpdir(), 'tsconfig-extends-array-'));
+  try {
+    write(root, 'tsconfig.base.json', '{"compilerOptions":{"strict":true}}\n');
+    write(root, 'legacy.json', '{"compilerOptions":{"moduleResolution":"node"}}\n');
+    write(root, 'tsconfig.json', '{"extends":["./tsconfig.base.json","./legacy.json"]}\n');
+    assert.throws(() => validateTsConfigPolicy(root), /moduleResolution must not be/u);
+    write(root, 'tsconfig.json', '{"extends":["./tsconfig.base.json",42]}\n');
+    assert.throws(() => validateTsConfigPolicy(root), /extends.*string/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+void test('tsconfig policy allows diamond inheritance but rejects real cycles', () => {
+  const root = mkdtempSync(join(tmpdir(), 'tsconfig-diamond-'));
+  try {
+    write(root, 'tsconfig.base.json', '{"compilerOptions":{"strict":true}}\n');
+    write(root, 'a.json', '{"extends":"./tsconfig.base.json"}\n');
+    write(root, 'b.json', '{"extends":"./tsconfig.base.json"}\n');
+    write(root, 'tsconfig.json', '{"references":[{"path":"./a.json"},{"path":"./b.json"}]}\n');
+    assert.doesNotThrow(() => validateTsConfigPolicy(root));
+    write(root, 'a.json', '{"extends":"./b.json"}\n');
+    write(root, 'b.json', '{"extends":"./a.json"}\n');
+    assert.throws(() => validateTsConfigPolicy(root), /Circular tsconfig chain/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
