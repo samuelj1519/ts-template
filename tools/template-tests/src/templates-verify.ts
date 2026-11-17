@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,13 @@ function runStep(cwd: string, command: string, args: string[]): number {
   return result.status ?? 1;
 }
 
+function runNpmStep(cwd: string, args: string[]): number {
+  const cli = process.env['TEMPLATE_NPM_CLI'] ?? process.env['npm_execpath'];
+  if (!cli || !existsSync(cli))
+    throw new Error('Run templates:verify through npm or provide TEMPLATE_NPM_CLI.');
+  return runStep(cwd, process.execPath, [cli, ...args]);
+}
+
 function verifyDirectory(id: string): Row {
   const directory = join(root, 'templates', id);
   const started = performance.now();
@@ -35,8 +42,13 @@ function verifyDirectory(id: string): Row {
   const installCode =
     manager === 'bun'
       ? runStep(directory, 'bun', ['install', '--frozen-lockfile'])
-      : runStep(directory, 'npm', ['ci']);
-  const checkCode = installCode === 0 ? runStep(directory, manager, ['run', 'check']) : installCode;
+      : runNpmStep(directory, ['ci']);
+  const checkCode =
+    installCode === 0
+      ? manager === 'bun'
+        ? runStep(directory, 'bun', ['run', 'check'])
+        : runNpmStep(directory, ['run', 'check'])
+      : installCode;
   const seconds = Math.round((performance.now() - started) / 1000);
   return { id, code: checkCode, seconds };
 }

@@ -4,11 +4,18 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { checkTemplates, composeRepository, syncTemplates } from '../src/assembly.ts';
+import {
+  checkTemplates,
+  composePackage,
+  composeRepository,
+  syncTemplates,
+} from '../src/assembly.ts';
 import { compareFiles, readFiles, rootExcluded } from '../src/files.ts';
 import { templateDirectoryId } from '../src/options.ts';
 import { parseCombinationInput, readRegistry } from '../src/registry.ts';
 import { bunLockStub, npmLockStub } from './lock-stubs.ts';
+
+const repository = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const EXPECTED_IDS = [
   'vanilla',
@@ -94,6 +101,20 @@ void test('registry exposes twelve template ids in stable order', () => {
   const registry = readRegistry(join(dirname(fileURLToPath(import.meta.url)), '../../..'));
   assert.deepEqual([...registry.templateIds].sort(), [...EXPECTED_IDS].sort());
   assert.equal(registry.combinations.length, 12);
+});
+
+void test('full checks include dependency security for every combination', async () => {
+  for (const combination of readRegistry(repository).combinations) {
+    const manifest = await composePackage(repository, combination);
+    const scripts = manifest['scripts'];
+    assert.ok(scripts && typeof scripts === 'object' && !Array.isArray(scripts));
+    const full = scripts['check:full'];
+    assert.ok(typeof full === 'string');
+    assert.ok(
+      full.split(' && ').includes(`${combination.packageManager} run check:security`),
+      `${templateDirectoryId(combination)} must run dependency security in check:full`,
+    );
+  }
 });
 
 void test('unknown combination triples are rejected', () => {

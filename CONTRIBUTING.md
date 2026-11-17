@@ -20,7 +20,7 @@ For nontrivial changes, follow the requirement, scope, implementation, independe
 
 Edit these inputs first. The root core and `templates/` payloads are generated mirrors. Do not hand-edit the twelve committed directories under `templates/`; change `scaffold/` (and related locks or generator code) and run `npm run templates:sync --prefix tools/template-tests`. Assembly rejects unknown registry fields, unsafe paths, source links, undeclared file collisions, and conflicting dependency versions. The root package remains exactly the vanilla package; maintainer commands live in the isolated test host.
 
-Each root or payload has one ordinary manifest and lockfile. The three authoritative locks represent different generated projects.
+Each root or payload has one ordinary manifest and lockfile. The twelve authoritative locks represent the reviewed package-manager and TypeScript-major options for the three generated projects.
 
 ## Synchronize and verify
 

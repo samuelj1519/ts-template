@@ -30,6 +30,7 @@ import { checkTemplates } from '../src/assembly.ts';
 import { withoutMaintainerRootScripts } from '../src/root-scripts.ts';
 import {
   rootExcluded,
+  stripWindowsDriveNamespace,
   templatePayloadExcluded,
   type FileEntry,
   type FileMap,
@@ -48,7 +49,9 @@ const repository = resolve(host, '../..');
 const payloadRoot = join(repository, 'templates');
 const ids: PresetId[] = ['vanilla', 'react', 'vue'];
 const generator = join(host, 'node_modules/giget/dist/cli.mjs');
-const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'ts-template-contracts-')));
+const scratch = stripWindowsDriveNamespace(
+  realpathSync.native(mkdtempSync(join(tmpdir(), 'ts-template-contracts-'))),
+);
 const source = join(scratch, 'source');
 const evidence = resolve(
   process.env['TEMPLATE_EVIDENCE_DIR'] ?? join(repository, 'artifacts/template-contracts'),

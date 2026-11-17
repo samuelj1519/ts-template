@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -20,7 +21,7 @@ import {
   syncTemplates,
 } from '../src/assembly.ts';
 import { maintainerRootScriptKeys } from '../src/root-scripts.ts';
-import { compareFiles, readFiles, rootExcluded } from '../src/files.ts';
+import { compareFiles, readFiles, rootExcluded, stripWindowsDriveNamespace } from '../src/files.ts';
 import type { PresetId } from '../src/registry.ts';
 import { bunLockStub, npmLockStub } from './lock-stubs.ts';
 
@@ -130,6 +131,42 @@ checks.push(
       await syncTemplates(root);
       compareFiles(readFiles(root, rootExcluded), before, 'Repeated synchronization');
     });
+  }),
+);
+
+checks.push(
+  test('sync preserves only allowlisted maintainer scripts in the root manifest', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      const path = join(root, 'package.json');
+      const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
+        scripts: Record<string, string>;
+      };
+      manifest.scripts['templates:verify'] = 'node synthetic-maintainer-check.ts';
+      writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
+      await syncTemplates(root);
+      const preserved = JSON.parse(readFileSync(path, 'utf8')) as {
+        scripts: Record<string, string>;
+      };
+      assert.equal(preserved.scripts['templates:verify'], 'node synthetic-maintainer-check.ts');
+      const payload = JSON.parse(
+        readFileSync(join(root, 'templates/vanilla/package.json'), 'utf8'),
+      ) as {
+        scripts: Record<string, string>;
+      };
+      assert.equal(payload.scripts['templates:verify'], undefined);
+    });
+  }),
+);
+
+checks.push(
+  test('Git paths remove only the Windows drive namespace prefix', () => {
+    assert.equal(stripWindowsDriveNamespace('\\\\?\\C:\\work\\repo'), 'C:\\work\\repo');
+    assert.equal(
+      stripWindowsDriveNamespace('\\\\?\\UNC\\server\\share\\repo'),
+      '\\\\?\\UNC\\server\\share\\repo',
+    );
+    assert.equal(stripWindowsDriveNamespace('/tmp/repo'), '/tmp/repo');
   }),
 );
 
@@ -288,6 +325,22 @@ checks.push(
 );
 
 checks.push(
+  test('Git-ignored agent settings do not create payload drift', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      const initialized = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' });
+      assert.equal(initialized.status, 0, initialized.stderr);
+      put(root, '.git/info/exclude', 'templates/vanilla/.claude/\ntemplates/vanilla/.cursor/\n');
+      put(root, 'templates/vanilla/.claude/settings.local.json', '{}\n');
+      put(root, 'templates/vanilla/.cursor/cli.json', '{}\n');
+      await checkTemplates(root);
+      put(root, 'templates/vanilla/untracked-edit.txt', 'drift\n');
+      await assert.rejects(checkTemplates(root), /complete file sets differ/u);
+    });
+  }),
+);
+
+checks.push(
   test('root bootstrap rejects scripts outside maintainerRootScriptKeys', async () => {
     const manifestPath = join(repository, 'package.json');
     const original = readFileSync(manifestPath, 'utf8');
@@ -312,9 +365,29 @@ checks.push(
       await syncTemplates(root);
       put(root, 'templates/vanilla/node_modules/leftover/package.json', '{}\n');
       put(root, 'templates/vanilla/.npm/_cacache/index', 'cache\n');
+      for (const directory of [root, join(root, 'templates/vanilla')]) {
+        put(directory, 'node_modules/tool.js', 'synthetic\n');
+        mkdirSync(join(directory, 'node_modules/.bin'), { recursive: true });
+        symlinkSync('../tool.js', join(directory, 'node_modules/.bin/tool'), 'file');
+      }
       await checkTemplates(root);
       put(root, 'templates/vanilla/untracked-edit.txt', 'drift\n');
       await assert.rejects(checkTemplates(root), /complete file sets differ/u);
+    });
+  }),
+);
+
+checks.push(
+  test('sync ignores install residuals instead of claiming matching root files', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      put(root, 'templates/vanilla/node_modules/leftover/package.json', '{}\n');
+      put(root, 'node_modules/leftover/package.json', '{}\n');
+      put(root, 'templates/vanilla/dist/generated.js', 'output\n');
+      put(root, 'dist/generated.js', 'output\n');
+      await syncTemplates(root);
+      assert.equal(readFileSync(join(root, 'node_modules/leftover/package.json'), 'utf8'), '{}\n');
+      assert.equal(readFileSync(join(root, 'dist/generated.js'), 'utf8'), 'output\n');
     });
   }),
 );

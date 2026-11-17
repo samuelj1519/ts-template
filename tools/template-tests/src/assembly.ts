@@ -15,6 +15,7 @@ import {
   compareFiles,
   lstatIfPresent,
   readFiles,
+  readGitVisibleFiles,
   realDirectory,
   rootExcluded,
   templatePayloadExcluded,
@@ -24,7 +25,7 @@ import {
 } from './files.ts';
 import type { FileEntry, FileMap } from './files.ts';
 import { canonicalJson, jsonFile, mergeObjects, parseObject } from './merge.ts';
-import { withoutMaintainerRootScripts } from './root-scripts.ts';
+import { withMaintainerRootScripts, withoutMaintainerRootScripts } from './root-scripts.ts';
 import type { JsonObject } from './merge.ts';
 import { authoritativeLockPath, templateDirectoryId, transformManifest } from './options.ts';
 import { presetIdSchema, readRegistry } from './registry.ts';
@@ -260,8 +261,26 @@ export async function composeRepository(root: string): Promise<Composition> {
   return { rootPreset: registry.rootPreset, templates };
 }
 
+function selectFiles(
+  files: FileMap,
+  prefix = '',
+  exclude: (path: string) => boolean = () => false,
+): FileMap {
+  const selected = new Map<string, FileEntry>();
+  for (const [repositoryPath, entry] of files) {
+    if (prefix && !repositoryPath.startsWith(`${prefix}/`)) continue;
+    const path = prefix ? repositoryPath.slice(prefix.length + 1) : repositoryPath;
+    const excluded = path
+      .split('/')
+      .some((_, index, parts) => exclude(parts.slice(0, index + 1).join('/')));
+    if (!excluded) selected.set(path, entry);
+  }
+  return selected;
+}
+
 export async function checkTemplates(root: string): Promise<void> {
   const composition = await composeRepository(root);
+  const current = readGitVisibleFiles(root);
   const output = join(root, 'templates');
   realDirectory(output);
   const expectedIds = new Set(composition.templates.map((entry) => entry.id));
@@ -272,14 +291,18 @@ export async function checkTemplates(root: string): Promise<void> {
     throw new Error('Unknown generated output directory.');
   for (const template of composition.templates)
     compareFiles(
-      readFiles(join(output, template.id), templatePayloadExcluded),
+      current
+        ? selectFiles(current, `templates/${template.id}`, templatePayloadExcluded)
+        : readFiles(join(output, template.id), templatePayloadExcluded),
       template.files,
       `templates/${template.id}`,
     );
   const selected = composition.templates.find((entry) => entry.id === composition.rootPreset);
   if (!selected) throw new Error('Root preset is missing.');
   compareFiles(
-    withoutMaintainerRootScripts(readFiles(root, rootExcluded)),
+    withoutMaintainerRootScripts(
+      current ? selectFiles(current, '', rootExcluded) : readFiles(root, rootExcluded),
+    ),
     selected.files,
     'Root bootstrap',
   );
@@ -289,7 +312,7 @@ function staleRootFiles(root: string, expected: FileMap): string[] {
   const previous = join(root, 'templates/vanilla');
   if (!existsSync(previous)) return [];
   const stale = [];
-  for (const [path, entry] of readFiles(previous)) {
+  for (const [path, entry] of readFiles(previous, templatePayloadExcluded)) {
     if (expected.has(path)) continue;
     const current = join(root, path);
     if (!lstatIfPresent(current)) continue;
@@ -314,7 +337,9 @@ function rootComparableEntry(path: string, current: FileEntry): FileEntry {
 
 function validateRootOwnership(root: string, expected: FileMap): void {
   const directory = join(root, 'templates/vanilla');
-  const previous = existsSync(directory) ? readFiles(directory) : new Map<string, FileEntry>();
+  const previous = existsSync(directory)
+    ? readFiles(directory, templatePayloadExcluded)
+    : new Map<string, FileEntry>();
   for (const [path, entry] of expected) {
     if (!lstatIfPresent(join(root, path))) continue;
     const current = readFiles(root, (name) => name !== path && !path.startsWith(`${name}/`)).get(
@@ -346,14 +371,15 @@ export async function syncTemplates(root: string): Promise<void> {
   validateRootOwnership(root, selected.files);
   for (const template of composition.templates) {
     const destination = join(output, template.id);
-    if (lstatIfPresent(destination)) readFiles(destination);
+    if (lstatIfPresent(destination)) readFiles(destination, templatePayloadExcluded);
   }
   const stage = mkdtempSync(join(tmpdir(), 'frontend-preset-stage-'));
   try {
     for (const template of composition.templates)
       writeFiles(join(stage, template.id), template.files);
     for (const path of stale) rmSync(path);
-    writeFiles(root, selected.files);
+    const currentRoot = readFiles(root, (name) => name !== 'package.json');
+    writeFiles(root, withMaintainerRootScripts(selected.files, currentRoot));
     mkdirSync(output, { recursive: true });
     for (const template of composition.templates) {
       const destination = join(output, template.id);

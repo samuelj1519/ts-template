@@ -88,6 +88,23 @@ function npmAuditCounts(stdout: string): { high: number; critical: number } | nu
   };
 }
 
+export function npmAuditFailure(result: {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+}): Record<string, unknown> | undefined {
+  if (result.status !== 0)
+    return {
+      auditCommandFailed: true,
+      status: result.status,
+      stderr: result.stderr.slice(0, 500),
+    };
+  const counts = npmAuditCounts(result.stdout);
+  if (!counts) return { parseError: true, stdout: result.stdout.slice(0, 500) };
+  if (counts.high > 0 || counts.critical > 0) return counts;
+  return undefined;
+}
+
 function auditNpm(
   root: string,
   combination: TemplateCombination,
@@ -105,23 +122,12 @@ function auditNpm(
     combination,
     `${String(result.stdout ?? '')}\n${String(result.stderr ?? '')}\nexit: ${String(result.status)}\n`,
   );
-  if (result.status !== 0) {
-    blockOnAudit(root, combination, {
-      auditCommandFailed: true,
-      status: result.status,
-      stderr: String(result.stderr ?? '').slice(0, 500),
-    });
-    return;
-  }
-  const counts = npmAuditCounts(String(result.stdout ?? ''));
-  if (!counts) {
-    blockOnAudit(root, combination, {
-      parseError: true,
-      stdout: String(result.stdout ?? '').slice(0, 500),
-    });
-    return;
-  }
-  if (counts.high > 0 || counts.critical > 0) blockOnAudit(root, combination, counts);
+  const failure = npmAuditFailure({
+    status: result.status,
+    stdout: String(result.stdout ?? ''),
+    stderr: String(result.stderr ?? ''),
+  });
+  if (failure) blockOnAudit(root, combination, failure);
 }
 
 function auditBun(

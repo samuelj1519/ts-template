@@ -5,6 +5,29 @@ export const maintainerRootScriptKeys = ['templates:verify'] as const;
 
 export type MaintainerRootScriptKey = (typeof maintainerRootScriptKeys)[number];
 
+export function withMaintainerRootScripts(files: FileMap, current: FileMap): FileMap {
+  const entry = files.get('package.json');
+  const currentEntry = current.get('package.json');
+  if (!entry || !currentEntry) return files;
+  const manifest = JSON.parse(entry.content.toString('utf8')) as {
+    scripts?: Record<string, string>;
+  };
+  const currentManifest = JSON.parse(currentEntry.content.toString('utf8')) as {
+    scripts?: Record<string, string>;
+  };
+  const scripts = { ...manifest.scripts };
+  for (const key of maintainerRootScriptKeys) {
+    const value = currentManifest.scripts?.[key];
+    if (value !== undefined) scripts[key] = value;
+  }
+  const clone = new Map(files);
+  clone.set('package.json', {
+    content: Buffer.from(JSON.stringify({ ...manifest, scripts }, null, 2) + '\n', 'utf8'),
+    mode: entry.mode,
+  });
+  return clone;
+}
+
 export function withoutMaintainerRootScripts(files: FileMap): FileMap {
   const entry = files.get('package.json');
   if (!entry) return files;

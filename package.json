@@ -31,7 +31,7 @@
     "check:licenses": "node tools/checks/licenses.ts",
     "check:toolchain": "node tools/checks/toolchain.ts",
     "check": "npm run format:check && npm run check:toolchain && npm run lint && npm run typecheck && npm run check:architecture && npm run spell",
-    "check:full": "npm run check && npm run test:policy && npm run test:coverage && npm run test:e2e && npm run check:unused && npm run check:licenses",
+    "check:full": "npm run check && npm run test:policy && npm run test:coverage && npm run test:e2e && npm run check:unused && npm run check:security && npm run check:licenses",
     "check:milestone": "npm run check:full && npm run test:mutation && npm run check:duplicates",
     "templates:verify": "npm run templates:verify --prefix tools/template-tests"
   },

@@ -10,7 +10,7 @@ npm run check
 
 ## Synchronize the inputs
 
-`scaffold/common/` owns shared files. `scaffold/presets/vanilla/`, `react/`, and `vue/` own their framework files and dependency fragments. `scaffold/presets.json` declares the supported presets and exact replacements. Each authoritative npm lock lives in `scaffold/locks/<preset>.json`.
+`scaffold/common/` owns shared files. `scaffold/presets/vanilla/`, `react/`, and `vue/` own their framework files and dependency fragments. `scaffold/presets.json` declares the supported presets and exact replacements. Each authoritative lock lives at `scaffold/locks/<preset>/<package-manager>-ts<major>.json` for npm or `.lock` for Bun.
 
 After editing the inputs, run:
 
@@ -20,7 +20,7 @@ npm run templates:sync
 npm run templates:check
 ```
 
-When dependencies change, run `npm run templates:locks` before synchronization. This explicit command uses fresh staging directories and the real npm CLI with `--package-lock-only` and disabled lifecycle scripts. It needs authorized registry access. It validates every completed lock before writing the three authoritative files. Run lock updates explicitly before synchronization.
+When dependencies change, run `npm run templates:locks` before synchronization. This explicit command uses fresh staging directories and the real npm CLI with `--package-lock-only` and disabled lifecycle scripts. It needs authorized registry access. It validates every completed lock before writing the twelve authoritative files. Run lock updates explicitly before synchronization.
 
 The composer rejects unsafe paths, source links, unknown registry fields, undeclared file collisions, conflicting package versions and scripts, mismatched locks, and unused replacement declarations. Package objects merge recursively; Oxlint plugins are combined. Only explicitly declared supported rule-option replacements may alter an existing rule, and their severity remains an error. JSON output uses the shared Prettier configuration. Ordinary files and npm locks retain their exact bytes.
 

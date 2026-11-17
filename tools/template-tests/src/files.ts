@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -44,6 +45,10 @@ export function validPath(path: string): boolean {
     posix.normalize(path) === path &&
     !path.split('/').some((part) => part === '..' || part === '.' || part === '')
   );
+}
+
+export function stripWindowsDriveNamespace(path: string): string {
+  return path.replace(/^\\\\\?\\(?=[A-Za-z]:[\\/])/u, '');
 }
 
 export function realDirectory(path: string): void {
@@ -99,6 +104,33 @@ export function readFiles(root: string, exclude: (path: string) => boolean = () 
     }
   }
   visit(root);
+  return new Map([...found].sort(([left], [right]) => left.localeCompare(right)));
+}
+
+export function readGitVisibleFiles(root: string): FileMap | undefined {
+  if (!existsSync(join(root, '.git'))) return undefined;
+  const result = spawnSync(
+    'git',
+    ['-C', stripWindowsDriveNamespace(root), 'ls-files', '-c', '-o', '--exclude-standard', '-z'],
+    { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0)
+    throw new Error(`Unable to list Git-visible repository files: ${result.stderr}`);
+  const paths = result.stdout.split('\0');
+  if (paths.pop() !== '') throw new Error('Git returned a malformed file list.');
+  const found = new Map<string, FileEntry>();
+  for (const path of paths) {
+    if (!validPath(path)) throw new Error(`Unsafe repository path: ${path}`);
+    const absolute = join(root, path);
+    const entry = lstatSync(absolute);
+    if (entry.isSymbolicLink() || !entry.isFile())
+      throw new Error(`Unexpected repository entry: ${path}`);
+    found.set(path, {
+      content: readFileSync(absolute),
+      mode: statSync(absolute).mode & 0o111 ? 0o755 : 0o644,
+    });
+  }
   return new Map([...found].sort(([left], [right]) => left.localeCompare(right)));
 }
 
