@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { check } from 'prettier';
@@ -89,17 +89,60 @@ function fixture(): string {
   );
   put(root, 'scaffold/options/bun/.githooks/pre-commit', '#!/bin/sh\nexit 0\n');
   put(root, 'CONTRIBUTING.md', 'Synthetic maintainer guide\n');
-  const initialized = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' });
+  const initialized = spawnSync('git', ['init', '--quiet', stripWindowsDriveNamespace(root)], {
+    encoding: 'utf8',
+  });
   if (initialized.status !== 0) throw new Error(initialized.stderr);
   return root;
 }
 
-async function isolated(run: (root: string) => void | Promise<void>): Promise<void> {
-  const root = fixture();
+function gitConfigPath(path: string): string {
+  return stripWindowsDriveNamespace(path).split(sep).join('/');
+}
+
+function isolateGitConfig(globalIgnore: string | undefined): () => void {
+  const directory = mkdtempSync(join(tmpdir(), 'frontend-gitconfig-'));
+  const config = join(directory, 'config');
+  if (globalIgnore === undefined) writeFileSync(config, '');
+  else {
+    const ignore = join(directory, 'ignore');
+    writeFileSync(ignore, globalIgnore);
+    writeFileSync(config, `[core]\n\texcludesFile = ${JSON.stringify(gitConfigPath(ignore))}\n`);
+  }
+  const saved = new Map<string, string | undefined>();
+  for (const key of Object.keys(process.env)) {
+    if (!key.startsWith('GIT_')) continue;
+    saved.set(key, process.env[key]);
+    delete process.env[key];
+  }
+  process.env['GIT_CONFIG_GLOBAL'] = gitConfigPath(config);
+  process.env['GIT_CONFIG_NOSYSTEM'] = '1';
+  process.env['GIT_TERMINAL_PROMPT'] = '0';
+  return () => {
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith('GIT_')) delete process.env[key];
+    }
+    for (const [key, value] of saved) {
+      if (value !== undefined) process.env[key] = value;
+    }
+    rmSync(directory, { recursive: true, force: true });
+  };
+}
+
+async function isolated(
+  run: (root: string) => void | Promise<void>,
+  globalIgnore?: string,
+): Promise<void> {
+  const restore = isolateGitConfig(globalIgnore);
   try {
-    await run(root);
+    const root = fixture();
+    try {
+      await run(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    restore();
   }
 }
 
@@ -176,7 +219,7 @@ checks.push(
   test('tracked file mode comes from the git index when the worktree bit differs', async () => {
     await isolated(async (root) => {
       const git = (args: readonly string[]) =>
-        spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+        spawnSync('git', ['-C', stripWindowsDriveNamespace(root), ...args], { encoding: 'utf8' });
       const initialized = git(['init', '--quiet']);
       assert.equal(initialized.status, 0, initialized.stderr);
       const filemode = git(['config', 'core.filemode', 'false']);
@@ -360,7 +403,9 @@ checks.push(
   test('Git-ignored agent settings do not create payload drift', async () => {
     await isolated(async (root) => {
       await syncTemplates(root);
-      const initialized = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' });
+      const initialized = spawnSync('git', ['init', '--quiet', stripWindowsDriveNamespace(root)], {
+        encoding: 'utf8',
+      });
       assert.equal(initialized.status, 0, initialized.stderr);
       put(root, '.git/info/exclude', 'templates/vanilla/.claude/\ntemplates/vanilla/.cursor/\n');
       put(root, 'templates/vanilla/.claude/settings.local.json', '{}\n');
@@ -391,21 +436,36 @@ checks.push(
   }),
 );
 
+async function assertResidualsDoNotHidePayloadDrift(root: string): Promise<void> {
+  await syncTemplates(root);
+  put(root, 'templates/vanilla/node_modules/leftover/package.json', '{}\n');
+  put(root, 'templates/vanilla/.npm/_cacache/index', 'cache\n');
+  put(root, 'templates/vanilla/dist/generated.js', 'output\n');
+  for (const directory of [root, join(root, 'templates/vanilla')]) {
+    put(directory, 'node_modules/tool.js', 'synthetic\n');
+    mkdirSync(join(directory, 'node_modules/.bin'), { recursive: true });
+    symlinkSync('../tool.js', join(directory, 'node_modules/.bin/tool'), 'file');
+  }
+  await checkTemplates(root);
+  put(root, 'templates/vanilla/untracked-edit.txt', 'drift\n');
+  await assert.rejects(checkTemplates(root), /complete file sets differ/u);
+  rmSync(join(root, 'templates/vanilla/untracked-edit.txt'));
+  symlinkSync('README.md', join(root, 'templates/vanilla/payload-link.txt'), 'file');
+  await assert.rejects(
+    checkTemplates(root),
+    /Unexpected repository entry: templates\/vanilla\/payload-link\.txt/u,
+  );
+}
+
 checks.push(
   test('complete checking ignores install residuals but rejects extra payload files', async () => {
-    await isolated(async (root) => {
-      await syncTemplates(root);
-      put(root, 'templates/vanilla/node_modules/leftover/package.json', '{}\n');
-      put(root, 'templates/vanilla/.npm/_cacache/index', 'cache\n');
-      for (const directory of [root, join(root, 'templates/vanilla')]) {
-        put(directory, 'node_modules/tool.js', 'synthetic\n');
-        mkdirSync(join(directory, 'node_modules/.bin'), { recursive: true });
-        symlinkSync('../tool.js', join(directory, 'node_modules/.bin/tool'), 'file');
-      }
-      await checkTemplates(root);
-      put(root, 'templates/vanilla/untracked-edit.txt', 'drift\n');
-      await assert.rejects(checkTemplates(root), /complete file sets differ/u);
-    });
+    await isolated(assertResidualsDoNotHidePayloadDrift);
+  }),
+);
+
+checks.push(
+  test('a global gitignore that lists node_modules still rejects extra payload files', async () => {
+    await isolated(assertResidualsDoNotHidePayloadDrift, 'node_modules\n');
   }),
 );
 

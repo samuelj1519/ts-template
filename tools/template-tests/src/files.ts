@@ -180,6 +180,14 @@ export function readFiles(root: string, exclude: (path: string) => boolean = () 
   return new Map([...found].sort(([left], [right]) => left.localeCompare(right)));
 }
 
+function gitListedResidual(path: string): boolean {
+  if (templatePayloadExcluded(path)) return true;
+  const parts = path.split('/');
+  if (parts[0] !== 'templates' || parts.length < 3) return false;
+  const payload = parts.slice(2);
+  return payload.some((_, index) => templatePayloadExcluded(payload.slice(0, index + 1).join('/')));
+}
+
 export function readGitVisibleFiles(root: string): FileMap | undefined {
   if (!existsSync(join(root, '.git'))) return undefined;
   const result = spawnSync(
@@ -196,6 +204,7 @@ export function readGitVisibleFiles(root: string): FileMap | undefined {
   const found = new Map<string, FileEntry>();
   for (const path of paths) {
     if (!validPath(path)) throw new Error(`Unsafe repository path: ${path}`);
+    if (gitListedResidual(path)) continue;
     const absolute = join(root, path);
     const entry = lstatSync(absolute);
     if (entry.isSymbolicLink() || !entry.isFile())
