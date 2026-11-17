@@ -23,6 +23,10 @@
     "typescript/no-useless-default-assignment": "error",
     "typescript/require-array-sort-compare": "error",
     "typescript/restrict-template-expressions": "error",
-    "typescript/unbound-method": "error"
+    "typescript/unbound-method": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/prefer-readonly": "error"
   }
 }

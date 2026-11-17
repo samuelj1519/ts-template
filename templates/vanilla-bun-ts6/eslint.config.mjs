@@ -36,6 +36,10 @@ const typeAwareRules = {
   '@typescript-eslint/require-array-sort-compare': 'error',
   '@typescript-eslint/restrict-template-expressions': 'error',
   '@typescript-eslint/unbound-method': 'error',
+  '@typescript-eslint/only-throw-error': 'error',
+  '@typescript-eslint/prefer-nullish-coalescing': 'error',
+  '@typescript-eslint/prefer-optional-chain': 'error',
+  '@typescript-eslint/prefer-readonly': 'error',
 };
 
 export default [

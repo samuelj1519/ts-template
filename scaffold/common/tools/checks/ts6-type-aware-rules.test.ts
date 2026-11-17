@@ -15,7 +15,7 @@ function writeEslintConfig(root: string, body: string): void {
 }
 
 void test('ts6 type-aware rules: manifest count and mismatch detection', async () => {
-  assert.equal(TS6_TYPE_AWARE_RULE_NAMES.length, 22);
+  assert.equal(TS6_TYPE_AWARE_RULE_NAMES.length, 26);
   const root = mkdtempSync(join(tmpdir(), 'ts6-rules-'));
   try {
     writeEslintConfig(root, ruleLines);
@@ -26,7 +26,7 @@ void test('ts6 type-aware rules: manifest count and mismatch detection', async (
         badRoot,
         ruleLines.replace(`  '${TS6_TYPE_AWARE_RULE_NAMES[0]}': 'error',`, ''),
       );
-      await assert.rejects(() => validateTs6TypeAwareRules(badRoot), /exactly 22/u);
+      await assert.rejects(() => validateTs6TypeAwareRules(badRoot), /exactly 26/u);
     } finally {
       rmSync(badRoot, { recursive: true, force: true });
     }

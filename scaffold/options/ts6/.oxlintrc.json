@@ -70,6 +70,12 @@
           "self"
         ]
       }
+    },
+    {
+      "files": ["vite.config.ts", "playwright.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
     }
   ]
 }

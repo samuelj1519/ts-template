@@ -11,3 +11,5 @@ For module, state, or backend changes, read `docs/architecture.md`. Parse extern
 Use synthetic fixtures and independent source, server, browser, and output locations. Verify the actual built artifact and running server. Wait for explicit asynchronous completion; query the original operation before retrying an unknown result.
 
 Use a new, independent reviewer session for nontrivial work. Follow `docs/verification.md` and record the candidate, commands, exits, failures, evidence, and remaining acceptance in the task or review record. Store runtime logs and build output in the configured artifact directories. Keep guides focused on current usage and constraints.
+
+Follow the TypeScript conventions in `docs/typescript.md`.

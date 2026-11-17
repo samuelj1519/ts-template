@@ -25,6 +25,10 @@ export const TS6_TYPE_AWARE_RULE_NAMES = [
   '@typescript-eslint/require-array-sort-compare',
   '@typescript-eslint/restrict-template-expressions',
   '@typescript-eslint/unbound-method',
+  '@typescript-eslint/only-throw-error',
+  '@typescript-eslint/prefer-nullish-coalescing',
+  '@typescript-eslint/prefer-optional-chain',
+  '@typescript-eslint/prefer-readonly',
 ] as const;
 
 function ruleIsEnabled(severity: unknown): boolean {
