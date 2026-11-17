@@ -455,6 +455,12 @@ async function assertResidualsDoNotHidePayloadDrift(root: string): Promise<void>
     checkTemplates(root),
     /Unexpected repository entry: templates\/vanilla\/payload-link\.txt/u,
   );
+  rmSync(join(root, 'templates/vanilla/payload-link.txt'));
+  symlinkSync('_cacache', join(root, 'templates/vanilla/.npm/cache-link'), 'file');
+  await assert.rejects(
+    checkTemplates(root),
+    /Unexpected repository entry: templates\/vanilla\/\.npm\/cache-link/u,
+  );
 }
 
 checks.push(
