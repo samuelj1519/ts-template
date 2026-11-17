@@ -268,6 +268,26 @@ checks.push(
 );
 
 checks.push(
+  test('root bootstrap ignores local agent settings directories', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      put(root, '.claude/settings.local.json', '{}\n');
+      put(root, '.cursor/cli.json', '{}\n');
+      await checkTemplates(root);
+      const composition = await composeRepository(root);
+      for (const template of composition.templates) {
+        assert.equal(
+          [...template.files.keys()].some(
+            (path) => path.startsWith('.claude/') || path.startsWith('.cursor/'),
+          ),
+          false,
+        );
+      }
+    });
+  }),
+);
+
+checks.push(
   test('root bootstrap rejects scripts outside maintainerRootScriptKeys', async () => {
     const manifestPath = join(repository, 'package.json');
     const original = readFileSync(manifestPath, 'utf8');

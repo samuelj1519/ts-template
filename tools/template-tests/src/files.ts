@@ -27,6 +27,8 @@ const maintenancePaths = new Set([
   'CONTRIBUTING.md',
   '.github/workflows/template.yml',
   '.handoff',
+  '.claude',
+  '.cursor',
   'scaffold',
   'templates',
   'tools/template-tests',
@@ -52,7 +54,10 @@ export function realDirectory(path: string): void {
 
 export function rootExcluded(path: string): boolean {
   if (runtimePaths.has(path) || maintenancePaths.has(path)) return true;
-  return path.startsWith('.handoff/');
+  if (path.startsWith('.handoff/')) return true;
+  if (path === '.claude' || path.startsWith('.claude/')) return true;
+  if (path === '.cursor' || path.startsWith('.cursor/')) return true;
+  return false;
 }
 
 const templateInstallResidualRoots = new Set(['.npm', '.bun']);

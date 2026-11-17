@@ -18,7 +18,7 @@ import { parseObject } from './merge.ts';
 import { readRegistry } from './registry.ts';
 import type { TemplateCombination } from './registry.ts';
 
-const HANDOFF_BLOCKER = '.handoff/待Nika拍板.md';
+const LOCK_AUDIT_BLOCKER = 'artifacts/template-locks/audit-approval-blocked.md';
 
 function writeLog(root: string, combination: TemplateCombination, body: string): void {
   writeFiles(
@@ -156,8 +156,10 @@ function blockOnAudit(
     '```',
     '',
   ].join('\n');
-  writeFileSync(join(root, HANDOFF_BLOCKER), body);
-  throw new Error(`Audit blocked lock generation; see ${HANDOFF_BLOCKER}.`);
+  const blocker = join(root, LOCK_AUDIT_BLOCKER);
+  mkdirSync(dirname(blocker), { recursive: true });
+  writeFileSync(blocker, body);
+  throw new Error(`Audit blocked lock generation; see ${LOCK_AUDIT_BLOCKER}.`);
 }
 
 function npmLock(

@@ -13,8 +13,7 @@ export type Ts6ReviewResult =
   | { readonly status: 'warning'; readonly reviewBy: Date; readonly message: string }
   | { readonly status: 'expired'; readonly reviewBy: Date; readonly message: string };
 
-const warningLink =
-  'https://github.com/samuelj1519/ts-template/blob/main/.handoff/%E9%80%89%E9%A1%B9%E6%96%B9%E6%A1%88.md';
+const warningLink = 'https://github.com/samuelj1519/ts-template/blob/main/docs/toolchain.md';
 
 export function loadTs6Review(
   projectRoot: string,

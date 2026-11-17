@@ -88,6 +88,10 @@ void test('handoff stays on maintainer root only', async () => {
     assert.equal(rootExcluded('.handoff'), true);
     assert.equal(rootExcluded('.handoff2'), false);
     assert.equal(rootExcluded('.handoff/extra.md'), true);
+    assert.equal(rootExcluded('.claude'), true);
+    assert.equal(rootExcluded('.claude/settings.local.json'), true);
+    assert.equal(rootExcluded('.cursor'), true);
+    assert.equal(rootExcluded('.cursor/cli.json'), true);
     const composition = await composeRepository(root);
     for (const template of composition.templates) {
       assert.equal(

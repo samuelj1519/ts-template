@@ -28,7 +28,12 @@ import { stripVTControlCharacters } from 'node:util';
 import { verifyInheritedPolicies } from './policy-probes.ts';
 import { checkTemplates } from '../src/assembly.ts';
 import { withoutMaintainerRootScripts } from '../src/root-scripts.ts';
-import { templatePayloadExcluded, type FileEntry, type FileMap } from '../src/files.ts';
+import {
+  rootExcluded,
+  templatePayloadExcluded,
+  type FileEntry,
+  type FileMap,
+} from '../src/files.ts';
 import {
   verifyAccessibilityMutation,
   verifyWrongNormalization,
@@ -59,7 +64,6 @@ const ignoredDirectories = new Set([
   '.stryker-tmp',
   '.worktrees',
 ]);
-const maintainerPaths = new Set(['CONTRIBUTING.md', '.github/workflows/template.yml']);
 let commandNumber = 0;
 const contracts: Promise<void>[] = [];
 
@@ -142,17 +146,7 @@ function git(args: readonly string[], cwd = source) {
 }
 
 function isMaintainerPath(path: string): boolean {
-  return (
-    maintainerPaths.has(path) ||
-    path === '.handoff' ||
-    path.startsWith('.handoff/') ||
-    path === 'templates' ||
-    path.startsWith('templates/') ||
-    path === 'scaffold' ||
-    path.startsWith('scaffold/') ||
-    path === 'tools/template-tests' ||
-    path.startsWith('tools/template-tests/')
-  );
+  return rootExcluded(path);
 }
 
 function files(

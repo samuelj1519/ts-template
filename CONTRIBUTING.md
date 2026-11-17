@@ -54,6 +54,8 @@ For a read-only drift check:
 npm run templates:check --prefix tools/template-tests
 ```
 
+Maintainer follow-up: narrow `generation.test.ts` `files()` so `templatePayloadExcluded` applies only where install-residual comparisons need it, not every generated-payload byte check.
+
 Recomposition compares every payload path, byte, and executable mode. Root parity compares the same complete vanilla core while excluding exact maintainer and output roots. Nested source directories named `reports` or `artifacts` remain checked. A sync refuses to delete a stale root file that no longer matches its previously generated value.
 
 The contracts invoke the installed community Giget CLI against disposable committed sources. They preserve the existing privacy, parent-workspace, destination-safety and behavior protections for all presets, and run each generated project's actual checks. Use a fresh destination that is not a symbolic link.
