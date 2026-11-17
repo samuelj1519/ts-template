@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -94,6 +95,8 @@ function minimalFixture(): string {
     JSON.stringify({ rules: { 'typescript/no-explicit-any': 'error' } }, null, 2) + '\n',
   );
   put(root, 'scaffold/options/bun/.githooks/pre-commit', '#!/bin/sh\nexit 0\n');
+  const initialized = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' });
+  if (initialized.status !== 0) throw new Error(initialized.stderr);
   return root;
 }
 

@@ -15,6 +15,7 @@ import {
   compareFiles,
   lstatIfPresent,
   readFiles,
+  ensureTrackedExecutable,
   readGitVisibleFiles,
   realDirectory,
   rootExcluded,
@@ -355,6 +356,13 @@ function validateRootOwnership(root: string, expected: FileMap): void {
   }
 }
 
+function recordExecutableModes(root: string, files: FileMap, prefix = ''): void {
+  for (const [path, entry] of files) {
+    if (entry.mode !== 0o755) continue;
+    ensureTrackedExecutable(root, prefix === '' ? path : `${prefix}/${path}`);
+  }
+}
+
 export async function syncTemplates(root: string): Promise<void> {
   const composition = await composeRepository(root);
   const selected = composition.templates.find((entry) => entry.id === composition.rootPreset);
@@ -379,12 +387,15 @@ export async function syncTemplates(root: string): Promise<void> {
       writeFiles(join(stage, template.id), template.files);
     for (const path of stale) rmSync(path);
     const currentRoot = readFiles(root, (name) => name !== 'package.json');
-    writeFiles(root, withMaintainerRootScripts(selected.files, currentRoot));
+    const rootFiles = withMaintainerRootScripts(selected.files, currentRoot);
+    writeFiles(root, rootFiles);
+    recordExecutableModes(root, rootFiles);
     mkdirSync(output, { recursive: true });
     for (const template of composition.templates) {
       const destination = join(output, template.id);
       rmSync(destination, { recursive: true, force: true });
       cpSync(join(stage, template.id), destination, { recursive: true, dereference: false });
+      recordExecutableModes(root, template.files, `templates/${template.id}`);
     }
   } finally {
     rmSync(stage, { recursive: true, force: true });

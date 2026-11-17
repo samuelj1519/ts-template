@@ -51,6 +51,78 @@ export function stripWindowsDriveNamespace(path: string): string {
   return path.replace(/^\\\\\?\\(?=[A-Za-z]:[\\/])/u, '');
 }
 
+function git(args: readonly string[]): { stdout: string; stderr: string; status: number | null } {
+  const result = spawnSync('git', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  if (result.error) throw result.error;
+  return { stdout: result.stdout, stderr: result.stderr, status: result.status };
+}
+
+function workTreeRoot(directory: string): string | undefined {
+  let current = directory;
+  for (;;) {
+    if (existsSync(join(current, '.git'))) return current;
+    const parent = dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
+function indexFileMode(mode: string): number {
+  if (mode === '100644') return 0o644;
+  if (mode === '100755') return 0o755;
+  throw new Error(`Unexpected Git file mode: ${mode}`);
+}
+
+function parseIndexRecords(stdout: string): Map<string, number> {
+  const modes = new Map<string, number>();
+  if (stdout.length === 0) return modes;
+  const records = stdout.split('\0');
+  if (records.pop() !== '') throw new Error('Git returned a malformed index.');
+  for (const record of records) {
+    const tab = record.indexOf('\t');
+    if (tab <= 0) throw new Error('Git returned a malformed index record.');
+    const header = record.slice(0, tab).split(' ');
+    const path = record.slice(tab + 1);
+    if (header.length !== 3 || header[2] !== '0') throw new Error(`Unmerged Git path: ${path}`);
+    if (!validPath(path)) throw new Error(`Unsafe repository path: ${path}`);
+    modes.set(path, indexFileMode(header[0] ?? ''));
+  }
+  return modes;
+}
+
+function indexModes(directory: string): ReadonlyMap<string, number> | undefined {
+  if (!workTreeRoot(directory)) return undefined;
+  const result = git(['-C', stripWindowsDriveNamespace(directory), 'ls-files', '-s', '-z']);
+  if (result.status !== 0) throw new Error(`Unable to read Git index modes: ${result.stderr}`);
+  return parseIndexRecords(result.stdout);
+}
+
+function diskMode(absolute: string): number {
+  return statSync(absolute).mode & 0o111 ? 0o755 : 0o644;
+}
+
+function recordedMode(
+  modes: ReadonlyMap<string, number> | undefined,
+  path: string,
+  absolute: string,
+): number {
+  return modes?.get(path) ?? diskMode(absolute);
+}
+
+export function ensureTrackedExecutable(root: string, path: string): void {
+  if (!validPath(path)) throw new Error(`Unsafe output path: ${path}`);
+  if (!existsSync(join(root, '.git'))) return;
+  const cwd = stripWindowsDriveNamespace(root);
+  const listed = git(['-C', cwd, 'ls-files', '-s', '-z', '--', path]);
+  if (listed.status !== 0) throw new Error(`Unable to read Git index mode: ${listed.stderr}`);
+  if (listed.stdout.startsWith('100755 ')) return;
+  const added = git(['-C', cwd, 'add', '--chmod=+x', '--', path]);
+  if (added.status !== 0)
+    throw new Error(
+      `Unable to record executable mode for ${path}: ${added.stderr || added.stdout}`,
+    );
+}
+
 export function realDirectory(path: string): void {
   const entry = lstatSync(path);
   if (!entry.isDirectory() || entry.isSymbolicLink())
@@ -85,6 +157,7 @@ export function templatePayloadExcluded(path: string): boolean {
 
 export function readFiles(root: string, exclude: (path: string) => boolean = () => false): FileMap {
   realDirectory(root);
+  const modes = indexModes(root);
   const found = new Map<string, FileEntry>();
   function visit(directory: string): void {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -98,7 +171,7 @@ export function readFiles(root: string, exclude: (path: string) => boolean = () 
         if (!entry.isFile()) throw new Error(`Unexpected template entry: ${path}`);
         found.set(path, {
           content: readFileSync(absolute),
-          mode: statSync(absolute).mode & 0o111 ? 0o755 : 0o644,
+          mode: recordedMode(modes, path, absolute),
         });
       }
     }
@@ -117,6 +190,7 @@ export function readGitVisibleFiles(root: string): FileMap | undefined {
   if (result.error) throw result.error;
   if (result.status !== 0)
     throw new Error(`Unable to list Git-visible repository files: ${result.stderr}`);
+  const modes = indexModes(root);
   const paths = result.stdout.split('\0');
   if (paths.pop() !== '') throw new Error('Git returned a malformed file list.');
   const found = new Map<string, FileEntry>();
@@ -128,7 +202,7 @@ export function readGitVisibleFiles(root: string): FileMap | undefined {
       throw new Error(`Unexpected repository entry: ${path}`);
     found.set(path, {
       content: readFileSync(absolute),
-      mode: statSync(absolute).mode & 0o111 ? 0o755 : 0o644,
+      mode: recordedMode(modes, path, absolute),
     });
   }
   return new Map([...found].sort(([left], [right]) => left.localeCompare(right)));

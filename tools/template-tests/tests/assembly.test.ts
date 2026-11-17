@@ -89,6 +89,8 @@ function fixture(): string {
   );
   put(root, 'scaffold/options/bun/.githooks/pre-commit', '#!/bin/sh\nexit 0\n');
   put(root, 'CONTRIBUTING.md', 'Synthetic maintainer guide\n');
+  const initialized = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' });
+  if (initialized.status !== 0) throw new Error(initialized.stderr);
   return root;
 }
 
@@ -167,6 +169,36 @@ checks.push(
       '\\\\?\\UNC\\server\\share\\repo',
     );
     assert.equal(stripWindowsDriveNamespace('/tmp/repo'), '/tmp/repo');
+  }),
+);
+
+checks.push(
+  test('tracked file mode comes from the git index when the worktree bit differs', async () => {
+    await isolated(async (root) => {
+      const git = (args: readonly string[]) =>
+        spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+      const initialized = git(['init', '--quiet']);
+      assert.equal(initialized.status, 0, initialized.stderr);
+      const filemode = git(['config', 'core.filemode', 'false']);
+      assert.equal(filemode.status, 0, filemode.stderr);
+      await syncTemplates(root);
+      const payload = join(root, 'templates/vanilla-bun-ts7');
+      const hook = join(payload, '.githooks/pre-commit');
+      chmodSync(hook, 0o644);
+      const executable = readFiles(payload).get('.githooks/pre-commit');
+      assert.ok(executable);
+      assert.equal(executable.mode, 0o755);
+      assert.equal(
+        executable.content.equals(
+          readFileSync(join(root, 'scaffold/options/bun/.githooks/pre-commit')),
+        ),
+        true,
+      );
+      const added = git(['add', '--', 'templates/vanilla-bun-ts7/package.json']);
+      assert.equal(added.status, 0, added.stderr);
+      chmodSync(join(payload, 'package.json'), 0o755);
+      assert.equal(readFiles(payload).get('package.json')?.mode, 0o644);
+    });
   }),
 );
 
