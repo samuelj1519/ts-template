@@ -59,7 +59,9 @@ for (const colorScheme of ['light', 'dark'] satisfies ('light' | 'dark')[]) {
       true,
     );
 
-    const accessibility = await new AxeBuilder({ page })
+    const accessibility = await new AxeBuilder({
+      page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]['page'],
+    })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
     expect(accessibility.violations).toEqual([]);

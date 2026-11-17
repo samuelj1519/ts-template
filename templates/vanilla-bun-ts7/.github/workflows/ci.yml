@@ -1,0 +1,44 @@
+name: Frontend checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install pinned npm
+        shell: bash
+        run: |
+          npm_prefix="$(node -p 'require("node:path").resolve(require("node:path").dirname(process.execPath), process.platform === "win32" ? "." : "..")')"
+          npm install --global --prefix "$npm_prefix" npm@12.2.2
+          npm --version
+      - run: npm ci
+      - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+      - run: npm run check:full
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: frontend-evidence-${{ matrix.os }}
+          path: |
+            coverage/
+            artifacts/
+          if-no-files-found: error

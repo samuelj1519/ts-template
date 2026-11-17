@@ -3,6 +3,10 @@ name: Preset contracts
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly audit advisory only (does not block merges).
+    - cron: '0 12 * * 0'
 
 permissions:
   contents: read
@@ -11,8 +15,57 @@ concurrency:
   group: template-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  BUN_VERSION: '1.3.11'
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../playwright-browsers
+
 jobs:
+  static:
+    name: static / twelve combinations
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tools/template-tests/package-lock.json
+            scaffold/locks/**/*
+      - name: Install pinned npm
+        shell: bash
+        run: |
+          npm_prefix="$(node -p 'require("node:path").resolve(require("node:path").dirname(process.execPath), process.platform === "win32" ? "." : "..")')"
+          npm install --global --prefix "$npm_prefix" npm@12.2.2
+          npm --version
+      - run: npm ci
+      - run: npm ci --prefix tools/template-tests
+      - name: Enumerate twelve committed template directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t expected < <(node --input-type=module -e "
+            import { readRegistry } from './tools/template-tests/src/registry.ts';
+            const registry = readRegistry('.');
+            const ids = [...registry.templateIds].sort();
+            for (const id of ids) console.log(id);
+          ")
+          mapfile -t actual < <(find templates -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+          printf 'expected: %s\n' "${expected[*]}"
+          printf 'actual: %s\n' "${actual[*]}"
+          test "${#expected[@]}" -eq 12
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+      - run: npm run format:inputs:check --prefix tools/template-tests
+      - run: npm run templates:check --prefix tools/template-tests
+      - run: npm run check:static --prefix tools/template-tests
+
   contracts:
+    name: contracts / ${{ matrix.os }}
+    if: github.event_name != 'schedule'
+    needs: static
     strategy:
       fail-fast: false
       matrix:
@@ -30,7 +83,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             tools/template-tests/package-lock.json
-            scaffold/locks/*.json
+            scaffold/locks/**/*
       - name: Install pinned npm
         shell: bash
         run: |
@@ -40,7 +93,168 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix tools/template-tests
       - run: node node_modules/@playwright/test/cli.js install --with-deps chromium
-      - run: npm run format:inputs:check --prefix tools/template-tests
-      - run: npm run templates:check --prefix tools/template-tests
       - run: npm run check --prefix tools/template-tests
-      - run: npm audit --audit-level=low --prefix tools/template-tests
+
+  twelve-check:
+    name: twelve-check / ${{ matrix.template }}
+    if: github.event_name != 'schedule'
+    needs: static
+    strategy:
+      fail-fast: false
+      matrix:
+        template:
+          - vanilla
+          - vanilla-npm-ts6
+          - vanilla-bun-ts7
+          - vanilla-bun-ts6
+          - react
+          - react-npm-ts6
+          - react-bun-ts7
+          - react-bun-ts6
+          - vue
+          - vue-npm-ts6
+          - vue-bun-ts7
+          - vue-bun-ts6
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Install pinned npm
+        run: |
+          npm_prefix="$(node -p 'require("node:path").resolve(require("node:path").dirname(process.execPath), process.platform === "win32" ? "." : "..")')"
+          npm install --global --prefix "$npm_prefix" npm@12.2.2
+          npm --version
+      - name: Install Bun for Bun templates
+        if: contains(matrix.template, '-bun-')
+        env:
+          BUN_LINUX_X64_SHA256: 8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed
+        run: |
+          set -euo pipefail
+          bun_install="$RUNNER_TEMP/bun"
+          mkdir -p "$bun_install"
+          archive="bun-linux-x64.zip"
+          curl -fsSL -o "$bun_install/$archive" \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${{ env.BUN_VERSION }}/$archive"
+          actual_sha="$(sha256sum "$bun_install/$archive" | awk '{print $1}')"
+          test "$actual_sha" = "$BUN_LINUX_X64_SHA256"
+          unzip -q "$bun_install/$archive" -d "$bun_install"
+          bun_bin="$(find "$bun_install" -name bun -type f | head -n 1)"
+          echo "$(dirname "$bun_bin")" >> "$GITHUB_PATH"
+      - name: Frozen install and check
+        working-directory: templates/${{ matrix.template }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.template }}" == *-bun-* ]]; then
+            bun install --frozen-lockfile
+            bun run check
+          else
+            npm ci
+            npm run check
+          fi
+
+  defaults-full-cross:
+    name: defaults-full-cross / ${{ matrix.template }} / ${{ matrix.os }}
+    if: github.event_name != 'schedule'
+    needs: static
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        template: [vanilla, react, vue]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../playwright-browsers
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: templates/${{ matrix.template }}/package-lock.json
+      - name: Install pinned npm
+        shell: bash
+        run: |
+          npm_prefix="$(node -p 'require("node:path").resolve(require("node:path").dirname(process.execPath), process.platform === "win32" ? "." : "..")')"
+          npm install --global --prefix "$npm_prefix" npm@12.2.2
+          npm --version
+      - name: Default check:full
+        working-directory: templates/${{ matrix.template }}
+        shell: bash
+        run: |
+          npm ci
+          node node_modules/@playwright/test/cli.js install --with-deps chromium
+          npm run check:full
+
+  defaults-milestone:
+    name: defaults-milestone / ${{ matrix.template }}
+    if: github.event_name != 'schedule'
+    needs: static
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [vanilla, react, vue]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../playwright-browsers
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: templates/${{ matrix.template }}/package-lock.json
+      - name: Install pinned npm
+        shell: bash
+        run: |
+          npm_prefix="$(node -p 'require("node:path").resolve(require("node:path").dirname(process.execPath), process.platform === "win32" ? "." : "..")')"
+          npm install --global --prefix "$npm_prefix" npm@12.2.2
+          npm --version
+      - name: Default preset milestone
+        working-directory: templates/${{ matrix.template }}
+        run: |
+          npm ci
+          node node_modules/@playwright/test/cli.js install --with-deps chromium
+          npm run check:milestone
+
+  npm-audit-advisory:
+    name: npm-audit-advisory / weekly
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Advisory npm audit (non-blocking)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          output="$(npm audit --audit-level=low --json 2>&1)" || status=$?
+          status="${status:-0}"
+          if ! node --input-type=module -e "
+            const payload = JSON.parse(process.argv[1]);
+            if (payload.error) {
+              console.error('npm audit returned error JSON:', payload.error);
+              process.exit(2);
+            }
+            const meta = payload.metadata?.vulnerabilities ?? {};
+            console.log('npm audit summary:', JSON.stringify(meta));
+            if ((meta.high ?? 0) + (meta.critical ?? 0) > 0) {
+              console.error('High or critical vulnerabilities present.');
+              process.exit(1);
+            }
+          " "$output"; then
+            echo 'npm audit advisory failed (see summary).'
+            exit "${status:-1}"
+          fi

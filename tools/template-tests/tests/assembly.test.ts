@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { check } from 'prettier';
 import {
   checkTemplates,
@@ -18,10 +19,13 @@ import {
   composeRepository,
   syncTemplates,
 } from '../src/assembly.ts';
+import { maintainerRootScriptKeys } from '../src/root-scripts.ts';
 import { compareFiles, readFiles, rootExcluded } from '../src/files.ts';
 import type { PresetId } from '../src/registry.ts';
+import { bunLockStub, npmLockStub } from './lock-stubs.ts';
 
 const ids: PresetId[] = ['vanilla', 'react', 'vue'];
+const repository = fileURLToPath(new URL('../../..', import.meta.url));
 const checks: Promise<void>[] = [];
 
 function put(root: string, path: string, value: string): void {
@@ -43,7 +47,11 @@ function fixture(): string {
     scripts: { check: 'node --version' },
     engines: { node: '>=26.13.1 <27', npm: '>=12.2.2 <13' },
     dependencies: {},
-    devDependencies: {},
+    devDependencies: {
+      typescript: '7.0.2',
+      oxlint: '1.93.0',
+      'oxlint-tsgolint': '7.0.2007',
+    },
   };
   json(root, 'scaffold/common/package.json', manifest);
   json(root, 'scaffold/common/.prettierrc.json', { singleQuote: true, printWidth: 100 });
@@ -57,24 +65,28 @@ function fixture(): string {
   json(root, 'scaffold/presets.json', {
     rootPreset: 'vanilla',
     presets: ids.map((id) => ({ id, replaces: [] })),
+    options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
   });
   for (const id of ids) {
     json(root, `scaffold/presets/${id}/package.json`, { dependencies: {} });
     json(root, `scaffold/presets/${id}/.oxlintrc.json`, { plugins: ['import'] });
-    json(root, `scaffold/locks/${id}.json`, {
-      name: manifest.name,
-      version: manifest.version,
-      lockfileVersion: 3,
-      packages: {
-        '': {
-          name: manifest.name,
-          version: manifest.version,
-          license: manifest.license,
-          engines: manifest.engines,
-        },
-      },
-    });
+    mkdirSync(join(root, `scaffold/locks/${id}`), { recursive: true });
+    for (const pm of ['npm', 'bun'] as const) {
+      for (const major of [7, 6] as const) {
+        const file = `${pm}-ts${major}.${pm === 'npm' ? 'json' : 'lock'}`;
+        if (pm === 'npm')
+          json(root, `scaffold/locks/${id}/${file}`, npmLockStub(manifest, id, pm, major));
+        else put(root, `scaffold/locks/${id}/${file}`, bunLockStub(manifest, id, pm, major));
+      }
+    }
   }
+  put(root, 'scaffold/options/ts6/eslint.config.mjs', 'export default [];\n');
+  put(
+    root,
+    'scaffold/options/ts6/.oxlintrc.json',
+    JSON.stringify({ rules: { 'typescript/no-explicit-any': 'error' } }, null, 2) + '\n',
+  );
+  put(root, 'scaffold/options/bun/.githooks/pre-commit', '#!/bin/sh\nexit 0\n');
   put(root, 'CONTRIBUTING.md', 'Synthetic maintainer guide\n');
   return root;
 }
@@ -89,20 +101,17 @@ async function isolated(run: (root: string) => void | Promise<void>): Promise<vo
 }
 
 checks.push(
-  test('composition is deterministic and sync is idempotent across all three presets', async () => {
+  test('composition is deterministic and sync is idempotent across all twelve templates', async () => {
     await isolated(async (root) => {
       const first = await composeRepository(root);
       const second = await composeRepository(root);
-      assert.deepEqual(
-        first.presets.map((preset) => preset.id),
-        ids,
-      );
-      for (const preset of first.presets) {
-        const matching = second.presets.find((entry) => entry.id === preset.id);
+      assert.equal(first.templates.length, 12);
+      for (const template of first.templates) {
+        const matching = second.templates.find((entry) => entry.id === template.id);
         assert.ok(matching);
-        compareFiles(preset.files, matching.files, preset.id);
+        compareFiles(template.files, matching.files, template.id);
         for (const filename of ['package.json', '.oxlintrc.json']) {
-          const output = preset.files.get(filename);
+          const output = template.files.get(filename);
           assert.ok(output);
           assert.equal(
             await check(output.content.toString('utf8'), {
@@ -128,7 +137,11 @@ checks.push(
   test('package composition is available before authoritative locks exist', async () => {
     await isolated(async (root) => {
       rmSync(join(root, 'scaffold/locks'), { recursive: true });
-      const manifest = await composePackage(root, 'react');
+      const manifest = await composePackage(root, {
+        preset: 'react',
+        packageManager: 'npm',
+        typescriptMajor: 7,
+      });
       assert.equal(manifest['name'], 'frontend-project');
       await assert.rejects(composeRepository(root), /ENOENT/u);
     });
@@ -142,16 +155,19 @@ checks.push(
       json(root, 'scaffold/presets.json', {
         rootPreset: 'vanilla',
         presets: [preset, preset, preset],
+        options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
       });
       await assert.rejects(composeRepository(root), /exactly once/u);
       json(root, 'scaffold/presets.json', {
         rootPreset: 'vanilla',
         presets: ids.map((id) => ({ id, replaces: ['../outside'] })),
+        options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
       });
       await assert.rejects(composeRepository(root), /safe, canonical/u);
       json(root, 'scaffold/presets.json', {
         rootPreset: 'vanilla',
         presets: ids.map((id) => ({ id, replaces: [], unknown: true })),
+        options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
       });
       await assert.rejects(composeRepository(root));
     });
@@ -166,11 +182,12 @@ checks.push(
       json(root, 'scaffold/presets.json', {
         rootPreset: 'vanilla',
         presets: ids.map((id) => ({ id, replaces: id === 'react' ? ['README.md'] : [] })),
+        options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
       });
       const composed = await composeRepository(root);
       assert.equal(
-        composed.presets
-          .find((preset) => preset.id === 'react')
+        composed.templates
+          .find((template) => template.id === 'react')
           ?.files.get('README.md')
           ?.content.toString(),
         'React documentation\n',
@@ -178,6 +195,7 @@ checks.push(
       json(root, 'scaffold/presets.json', {
         rootPreset: 'vanilla',
         presets: ids.map((id) => ({ id, replaces: ['missing.txt'] })),
+        options: { packageManagers: ['npm', 'bun'], typescriptMajors: [7, 6], forbidden: [] },
       });
       await assert.rejects(composeRepository(root), /Unused file replacement/u);
     });
@@ -199,7 +217,10 @@ checks.push(
         devDependencies: {},
       });
       json(root, 'scaffold/presets/react/package.json', { dependencies: { example: '2.0.0' } });
-      await assert.rejects(composePackage(root, 'react'), /dependencies\/example/u);
+      await assert.rejects(
+        composePackage(root, { preset: 'react', packageManager: 'npm', typescriptMajor: 7 }),
+        /dependencies\/example/u,
+      );
     });
   }),
 );
@@ -218,7 +239,7 @@ checks.push(
       );
       await assert.rejects(composeRepository(root), /Unsafe template entry/u);
       rmSync(join(root, 'scaffold/common/linked'), { recursive: true });
-      json(root, 'scaffold/locks/vue.json', {
+      json(root, 'scaffold/locks/vue/npm-ts7.json', {
         name: 'wrong',
         version: '0.1.0',
         lockfileVersion: 3,
@@ -242,6 +263,58 @@ checks.push(
         readFileSync(join(root, 'src/features/reports/model.ts'), 'utf8'),
         'export const value = 1;\n',
       );
+    });
+  }),
+);
+
+checks.push(
+  test('root bootstrap ignores local agent settings directories', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      put(root, '.claude/settings.local.json', '{}\n');
+      put(root, '.cursor/cli.json', '{}\n');
+      await checkTemplates(root);
+      const composition = await composeRepository(root);
+      for (const template of composition.templates) {
+        assert.equal(
+          [...template.files.keys()].some(
+            (path) => path.startsWith('.claude/') || path.startsWith('.cursor/'),
+          ),
+          false,
+        );
+      }
+    });
+  }),
+);
+
+checks.push(
+  test('root bootstrap rejects scripts outside maintainerRootScriptKeys', async () => {
+    const manifestPath = join(repository, 'package.json');
+    const original = readFileSync(manifestPath, 'utf8');
+    const manifest = JSON.parse(original) as { scripts?: Record<string, string> };
+    manifest.scripts = {
+      ...manifest.scripts,
+      'synthetic-extra-maintainer': 'node --version',
+    };
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    try {
+      await assert.rejects(checkTemplates(repository), /Root bootstrap/u);
+      assert.deepEqual([...maintainerRootScriptKeys], ['templates:verify']);
+    } finally {
+      writeFileSync(manifestPath, original);
+    }
+  }),
+);
+
+checks.push(
+  test('complete checking ignores install residuals but rejects extra payload files', async () => {
+    await isolated(async (root) => {
+      await syncTemplates(root);
+      put(root, 'templates/vanilla/node_modules/leftover/package.json', '{}\n');
+      put(root, 'templates/vanilla/.npm/_cacache/index', 'cache\n');
+      await checkTemplates(root);
+      put(root, 'templates/vanilla/untracked-edit.txt', 'drift\n');
+      await assert.rejects(checkTemplates(root), /complete file sets differ/u);
     });
   }),
 );

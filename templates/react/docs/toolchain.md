@@ -47,7 +47,7 @@ These direct tool selections were checked against stable release data on 2026-11
 
 The security overrides select current stable dependency releases for the locked graph. Review their advisory rationale and compatibility when updating the dependency tree. Review dependency-tree changes before updating the locks.
 
-Oxlint type-aware rules require `oxlint-tsgolint` and `--type-aware`. The official TypeScript compiler remains a separate check. Real negative probes verify promise safety, unsafe values, React Hooks, accessibility, and architectural boundaries.
+TypeScript 7 projects run Oxlint in two deny-warnings stages: a non-type `.oxlintrc.json` pass, then a type-aware pass using `.oxlintrc.typed.json` with `oxlint-tsgolint`. TypeScript 6 projects run the non-type Oxlint pass and delegate the same twenty-two type rules to ESLint with `typescript-eslint` and `projectService`. The official TypeScript compiler remains a separate check. Real negative probes verify promise safety, unsafe values, React Hooks, accessibility, and architectural boundaries.
 
 Each preset extends its project-local `tsconfig.base.json`; all configuration inputs remain inside the generated project. Stryker uses `tsconfigFile: ""` because its optional configuration-path rewriting uses the older TypeScript compiler API. The official compiler runs before mutation testing, and Vitest executes each instrumented version in Stryker's sandbox. If configuration references are added, review their sandbox resolution before changing this setting.
 

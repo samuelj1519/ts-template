@@ -26,6 +26,9 @@ export const runtimePaths = new Set([
 const maintenancePaths = new Set([
   'CONTRIBUTING.md',
   '.github/workflows/template.yml',
+  '.handoff',
+  '.claude',
+  '.cursor',
   'scaffold',
   'templates',
   'tools/template-tests',
@@ -50,7 +53,29 @@ export function realDirectory(path: string): void {
 }
 
 export function rootExcluded(path: string): boolean {
-  return runtimePaths.has(path) || maintenancePaths.has(path);
+  if (runtimePaths.has(path) || maintenancePaths.has(path)) return true;
+  if (path.startsWith('.handoff/')) return true;
+  if (path === '.claude' || path.startsWith('.claude/')) return true;
+  if (path === '.cursor' || path.startsWith('.cursor/')) return true;
+  return false;
+}
+
+const templateInstallResidualRoots = new Set(['.npm', '.bun']);
+const templateRuntimeOutputRoots = new Set([
+  'dist',
+  'coverage',
+  'artifacts',
+  'reports',
+  '.stryker-tmp',
+  '.worktrees',
+]);
+
+export function templatePayloadExcluded(path: string): boolean {
+  const parts = path.split('/');
+  if (parts.some((part) => part === 'node_modules')) return true;
+  const root = parts[0];
+  if (root !== undefined && templateInstallResidualRoots.has(root)) return true;
+  return root !== undefined && templateRuntimeOutputRoots.has(root);
 }
 
 export function readFiles(root: string, exclude: (path: string) => boolean = () => false): FileMap {

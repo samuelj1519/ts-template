@@ -19,12 +19,16 @@
     "templates:sync": "node src/cli.ts sync",
     "templates:check": "node src/cli.ts check",
     "templates:locks": "node src/cli.ts locks",
+    "templates:verify": "node src/templates-verify.ts",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
+    "test:static": "node --test --test-concurrency=1 tests/assembly.test.ts tests/handoff-isolation.test.ts tests/locks-audit.test.ts tests/options-matrix.test.ts tests/react-ts6-oxlint.test.ts tests/workflow-static.test.ts",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "check:static": "npm run format:check && npm run lint && npm run typecheck && npm run test:static"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "giget": "3.3.1",
+    "jsonc-parser": "3.3.1",
     "oxlint": "1.93.0",
     "oxlint-tsgolint": "7.0.2007",
     "prettier": "3.10.1",

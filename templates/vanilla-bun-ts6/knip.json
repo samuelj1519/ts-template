@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/app/main.ts", "tools/checks/*.ts"],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "tools/checks/*.ts",
+    "e2e/*.ts",
+    "*.config.ts",
+    "vite.plugins.ts"
+  ],
+  "ignore": ["/scaffold/**", "/templates/**", "/tools/template-tests/**"]
+}

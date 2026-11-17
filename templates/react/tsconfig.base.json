@@ -25,6 +25,9 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "skipLibCheck": false,
+    "stableTypeOrdering": true,
+    "libReplacement": false,
+    "rootDir": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

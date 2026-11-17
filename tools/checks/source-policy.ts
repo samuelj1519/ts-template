@@ -3,6 +3,7 @@ import { basename, extname, join } from 'node:path';
 import { parseSync } from '@swc/core';
 import { z } from 'zod';
 import { sourceExtensions } from '../../quality.config.ts';
+import { validateBunPolicy } from './bun-policy.ts';
 
 export function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -36,6 +37,7 @@ export function validateSource(source: string, filename: string): void {
     );
   }
   checkModuleSyntax(tree);
+  validateBunPolicy(tree, filename);
 }
 
 function checkModuleSyntax(node: unknown): void {

@@ -16,5 +16,10 @@
       "replaces": [],
       "ruleOverrides": []
     }
-  ]
+  ],
+  "options": {
+    "packageManagers": ["npm", "bun"],
+    "typescriptMajors": [7, 6],
+    "forbidden": []
+  }
 }

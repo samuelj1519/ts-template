@@ -1,3 +1,9 @@
+/**
+ * CI scheduling (simplified acceptance): `template.yml / contracts` runs this full suite on three
+ * systems. Defaults use `defaults-full-cross` and `defaults-milestone`; all twelve payloads use
+ * `twelve-check` with frozen install and `check`. This file stays the behavioral contract source;
+ * `npm run test:static` stays cheap and excludes it.
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
@@ -21,6 +27,13 @@ import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 import { verifyInheritedPolicies } from './policy-probes.ts';
 import { checkTemplates } from '../src/assembly.ts';
+import { withoutMaintainerRootScripts } from '../src/root-scripts.ts';
+import {
+  rootExcluded,
+  templatePayloadExcluded,
+  type FileEntry,
+  type FileMap,
+} from '../src/files.ts';
 import {
   verifyAccessibilityMutation,
   verifyWrongNormalization,
@@ -51,7 +64,6 @@ const ignoredDirectories = new Set([
   '.stryker-tmp',
   '.worktrees',
 ]);
-const maintainerPaths = new Set(['CONTRIBUTING.md', '.github/workflows/template.yml']);
 let commandNumber = 0;
 const contracts: Promise<void>[] = [];
 
@@ -134,15 +146,7 @@ function git(args: readonly string[], cwd = source) {
 }
 
 function isMaintainerPath(path: string): boolean {
-  return (
-    maintainerPaths.has(path) ||
-    path === 'templates' ||
-    path.startsWith('templates/') ||
-    path === 'scaffold' ||
-    path.startsWith('scaffold/') ||
-    path === 'tools/template-tests' ||
-    path.startsWith('tools/template-tests/')
-  );
+  return rootExcluded(path);
 }
 
 function files(
@@ -155,6 +159,7 @@ function files(
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const absolute = join(directory, entry.name);
       const path = relative(root, absolute).split(sep).join('/');
+      if (templatePayloadExcluded(path)) continue;
       if (excludeOutputs && ignoredDirectories.has(path)) continue;
       if (excludeMaintainer && isMaintainerPath(path)) continue;
       assert.equal(entry.isSymbolicLink(), false, `Unexpected source link: ${path}`);
@@ -174,6 +179,16 @@ function equalFiles(actual: Map<string, Buffer>, expected: Map<string, Buffer>):
   for (const [path, bytes] of expected) {
     assert.deepEqual(actual.get(path), bytes, `File bytes differ: ${path}`);
   }
+}
+
+function asFileMap(files: Map<string, Buffer>): FileMap {
+  return new Map(
+    [...files].map(([path, content]): [string, FileEntry] => [path, { content, mode: 0o644 }]),
+  );
+}
+
+function asByteMap(files: FileMap): Map<string, Buffer> {
+  return new Map([...files].map(([path, entry]) => [path, entry.content]));
 }
 
 function jsonRecord(path: string): Record<string, unknown> {
@@ -205,7 +220,14 @@ before(() => {
   assert.equal(existsSync(payloadRoot), true, 'The generation payload must exist');
   assert.ok(files(payloadRoot).size > 0, 'The generation payload must not be empty');
   mkdirSync(source);
-  cpSync(payloadRoot, join(source, 'templates'), { recursive: true, dereference: false });
+  cpSync(payloadRoot, join(source, 'templates'), {
+    recursive: true,
+    dereference: false,
+    filter: (src) => {
+      const rel = relative(payloadRoot, src).split(sep).join('/');
+      return rel === '' || !templatePayloadExcluded(rel);
+    },
+  });
   for (const id of ids) mkdirSync(join(scratch, id));
   writeFileSync(join(source, 'SOURCE_ONLY_README.md'), 'Synthetic maintainer document\n');
   writeFileSync(join(source, '.env'), 'SYNTHETIC_PRIVATE_MARKER=fixture-only\n');
@@ -247,7 +269,10 @@ after(() => {
 contracts.push(
   test('the repository bootstraps from every payload path and byte', async () => {
     await checkTemplates(repository);
-    equalFiles(files(repository, true, true), files(join(payloadRoot, 'vanilla')));
+    equalFiles(
+      asByteMap(withoutMaintainerRootScripts(asFileMap(files(repository, true, true)))),
+      files(join(payloadRoot, 'vanilla')),
+    );
   }),
 );
 
