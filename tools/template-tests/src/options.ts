@@ -95,10 +95,7 @@ export function transformManifest(
     if (!devDependencies['oxlint-tsgolint']) devDependencies['oxlint-tsgolint'] = '7.0.2007';
   }
 
-  scripts['check:security'] =
-    combination.packageManager === 'bun'
-      ? 'bun audit --audit-level=low'
-      : 'npm audit --audit-level=low';
+  scripts['check:security'] = 'node tools/checks/audit-guard.ts';
 
   manifest['scripts'] = scripts;
   manifest['devDependencies'] = devDependencies;

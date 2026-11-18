@@ -1,0 +1,257 @@
+{
+  "advisoryId": "GHSA-fc5q-39xc-vjpf",
+  "package": "picomatch",
+  "lockedVersion": "4.0.7",
+  "scope": "devOnly",
+  "paths": [
+    ["@stryker-mutator/vitest-runner", "vitest", "@vitest/mocker", "vite", "picomatch"],
+    [
+      "@stryker-mutator/vitest-runner",
+      "vitest",
+      "@vitest/mocker",
+      "vite",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "@stryker-mutator/vitest-runner",
+      "vitest",
+      "@vitest/mocker",
+      "vite",
+      "tinyglobby",
+      "picomatch"
+    ],
+    ["@stryker-mutator/vitest-runner", "vitest", "picomatch"],
+    ["@stryker-mutator/vitest-runner", "vitest", "tinyglobby", "fdir", "picomatch"],
+    ["@stryker-mutator/vitest-runner", "vitest", "tinyglobby", "picomatch"],
+    ["@stryker-mutator/vitest-runner", "vitest", "vite", "picomatch"],
+    ["@stryker-mutator/vitest-runner", "vitest", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["@stryker-mutator/vitest-runner", "vitest", "vite", "tinyglobby", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "@vitest/mocker", "vite", "picomatch"],
+    [
+      "@testing-library/jest-dom",
+      "vitest",
+      "@vitest/mocker",
+      "vite",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    ["@testing-library/jest-dom", "vitest", "@vitest/mocker", "vite", "tinyglobby", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "tinyglobby", "fdir", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "tinyglobby", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "vite", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["@testing-library/jest-dom", "vitest", "vite", "tinyglobby", "picomatch"],
+    ["@vitejs/plugin-react", "vite", "picomatch"],
+    ["@vitejs/plugin-react", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["@vitejs/plugin-react", "vite", "tinyglobby", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "@vitest/mocker", "vite", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "@vitest/mocker", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "@vitest/mocker", "vite", "tinyglobby", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "tinyglobby", "fdir", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "tinyglobby", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "vite", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["@vitest/coverage-v8", "vitest", "vite", "tinyglobby", "picomatch"],
+    ["cspell", "@cspell/cspell-worker", "cspell-lib", "cspell-glob", "picomatch"],
+    ["cspell", "cspell-gitignore", "cspell-glob", "picomatch"],
+    ["cspell", "cspell-glob", "picomatch"],
+    ["cspell", "cspell-lib", "cspell-glob", "picomatch"],
+    ["cspell", "tinyglobby", "fdir", "picomatch"],
+    ["cspell", "tinyglobby", "picomatch"],
+    ["dependency-cruiser", "picomatch"],
+    ["knip", "picomatch"],
+    ["knip", "tinyglobby", "fdir", "picomatch"],
+    ["knip", "tinyglobby", "picomatch"],
+    [
+      "license-checker-rseidelsohn",
+      "@npmcli/arborist",
+      "@npmcli/metavuln-calculator",
+      "pacote",
+      "@npmcli/run-script",
+      "node-gyp",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "license-checker-rseidelsohn",
+      "@npmcli/arborist",
+      "@npmcli/metavuln-calculator",
+      "pacote",
+      "@npmcli/run-script",
+      "node-gyp",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "license-checker-rseidelsohn",
+      "@npmcli/arborist",
+      "@npmcli/run-script",
+      "node-gyp",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "license-checker-rseidelsohn",
+      "@npmcli/arborist",
+      "@npmcli/run-script",
+      "node-gyp",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "license-checker-rseidelsohn",
+      "@npmcli/arborist",
+      "pacote",
+      "@npmcli/run-script",
+      "node-gyp",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "license-checker-rseidelsohn",
+      "@npmcli/arborist",
+      "pacote",
+      "@npmcli/run-script",
+      "node-gyp",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/parser",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/parser",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/type-utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/type-utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/type-utils",
+      "@typescript-eslint/utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/type-utils",
+      "@typescript-eslint/utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/parser",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/parser",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    ["typescript-eslint", "@typescript-eslint/typescript-estree", "tinyglobby", "picomatch"],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "fdir",
+      "picomatch"
+    ],
+    [
+      "typescript-eslint",
+      "@typescript-eslint/utils",
+      "@typescript-eslint/typescript-estree",
+      "tinyglobby",
+      "picomatch"
+    ],
+    ["vite", "picomatch"],
+    ["vite", "tinyglobby", "fdir", "picomatch"],
+    ["vite", "tinyglobby", "picomatch"],
+    ["vitest", "@vitest/mocker", "vite", "picomatch"],
+    ["vitest", "@vitest/mocker", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["vitest", "@vitest/mocker", "vite", "tinyglobby", "picomatch"],
+    ["vitest", "picomatch"],
+    ["vitest", "tinyglobby", "fdir", "picomatch"],
+    ["vitest", "tinyglobby", "picomatch"],
+    ["vitest", "vite", "picomatch"],
+    ["vitest", "vite", "tinyglobby", "fdir", "picomatch"],
+    ["vitest", "vite", "tinyglobby", "picomatch"]
+  ],
+  "reason": "Disputed advisory: Snyk SNYK-JS-PICOMATCH-21248802 is revoked as deemed not a vulnerability with a maintainer dispute, and the Vite member comment on vite#24131 (comment 6963223033) reports a false positive. Product paths are excluded per the archived risk assessment (acceptance items 1-4). GHSA-fc5q-39xc-vjpf remains listed, so this time-boxed exception covers only the existing locked tree.",
+  "approvedBy": "Nika",
+  "approvedAt": "2026-11-18T14:39:00+08:00",
+  "expiresAt": "2026-12-18T14:39:00+08:00",
+  "evidence": [
+    "Archived risk assessment ts-template-picomatch (acceptance items 1-4, 2026-11-18); report path recorded in artifacts/security-exception/implementation.md",
+    "Concrete dependency chains enumerated from the root package-lock.json and the twelve committed combination locks (npm lockfileVersion 3 and bun lockfileVersion 1)",
+    "Work-group approval by Nika, 2026-11-18T14:39:00+08:00, valid for 30 days"
+  ]
+}

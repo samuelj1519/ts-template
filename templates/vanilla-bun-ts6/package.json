@@ -27,7 +27,7 @@
     "test:mutation": "bun run typecheck && stryker run && node tools/checks/mutation.ts",
     "check:unused": "knip --strict",
     "check:duplicates": "jscpd src --config .jscpd.json",
-    "check:security": "bun audit --audit-level=low",
+    "check:security": "node tools/checks/audit-guard.ts",
     "check:licenses": "node tools/checks/licenses.ts",
     "check:toolchain": "node tools/checks/toolchain.ts",
     "check": "bun run format:check && bun run check:toolchain && bun run lint && bun run typecheck && bun run check:architecture && bun run spell",
